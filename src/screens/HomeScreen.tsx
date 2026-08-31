@@ -1,9 +1,20 @@
+import { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Logo } from '@/components/Logo';
-import { Sparkles, BookOpen, LogOut } from 'lucide-react';
+import { Sparkles, BookOpen, LogOut, X } from 'lucide-react';
 
 export function HomeScreen() {
   const { user, navigate, logout } = useAuth();
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
+  const handleLogoutClick = () => {
+    setShowLogoutConfirm(true);
+  };
+
+  const confirmLogout = () => {
+    logout();
+    setShowLogoutConfirm(false);
+  };
 
   return (
     <div className="min-h-screen flex flex-col bg-ink-900 px-6 pt-16 pb-10 safe-top safe-bottom">
@@ -12,13 +23,15 @@ export function HomeScreen() {
           <Logo size="sm" />
           <span className="font-serif text-xl text-ink-50">Delulu</span>
         </div>
-        {user?.picture ? (
-          <img src={user.picture} alt={user.name} className="h-9 w-9 rounded-full border border-ink-600 object-cover" />
-        ) : (
-          <div className="h-9 w-9 rounded-full bg-ink-700 flex items-center justify-center text-ink-200 text-xs font-medium">
-            {user?.name?.charAt(0).toUpperCase() || '?'}
-          </div>
-        )}
+        <button type="button" onClick={handleLogoutClick} className="p-0 bg-transparent border-0 focus:outline-none">
+          {user?.picture ? (
+            <img src={user.picture} alt={user.name} className="h-9 w-9 rounded-full border border-ink-600 object-cover" />
+          ) : (
+            <div className="h-9 w-9 rounded-full bg-ink-700 flex items-center justify-center text-ink-200 text-xs font-medium">
+              {user?.name?.charAt(0).toUpperCase() || '?'}
+            </div>
+          )}
+        </button>
       </div>
 
       <div className="mb-10 animate-fade-up">
@@ -62,10 +75,34 @@ export function HomeScreen() {
       </div>
 
       <div className="pt-6 animate-fade-in" style={{ animationDelay: '0.3s' }}>
-        <button onClick={logout} className="flex items-center gap-2 text-ink-400 text-xs hover:text-ink-200 transition-colors">
+        <button onClick={handleLogoutClick} className="flex items-center gap-2 text-ink-400 text-xs hover:text-ink-200 transition-colors">
           <LogOut className="h-3.5 w-3.5" /> Sign out
         </button>
       </div>
+
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-6 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-3xl border border-ink-600 bg-ink-800 p-5 shadow-2xl shadow-black/30">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-serif text-xl text-ink-50">Confirm logout</h3>
+              <button type="button" onClick={() => setShowLogoutConfirm(false)} className="p-1 text-ink-400 hover:text-ink-200 transition-colors">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <p className="text-sm text-ink-300 leading-relaxed mb-5">Are you sure you want to sign out? You’ll need to log in again to continue your stories.</p>
+
+            <div className="flex gap-3">
+              <button type="button" onClick={() => setShowLogoutConfirm(false)} className="flex-1 rounded-2xl border border-ink-600 bg-ink-700 px-4 py-2.5 text-sm font-medium text-ink-200 transition-colors hover:border-ink-500 hover:text-ink-50">
+                Cancel
+              </button>
+              <button type="button" onClick={confirmLogout} className="flex-1 rounded-2xl bg-rose-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-rose-400">
+                Yes, logout
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
