@@ -209,6 +209,11 @@ export function ChatScreen() {
 
 function MessageBubble({ message, onSuggestionClick }: { message: Message; onSuggestionClick?: (optionIndex: number) => void }) {
   const isUser = message.role === 'user';
+  const parsedAssistant = !isUser ? parseAssistantResponse(message.content) : null;
+  const displayContent = parsedAssistant?.narration || message.content;
+  const displaySuggestions = (message.suggestions && message.suggestions.length > 0)
+    ? message.suggestions
+    : (parsedAssistant?.suggestions ?? []);
 
   return (
     <div className={`flex animate-fade-up ${isUser ? 'justify-end' : 'justify-start'}`}>
@@ -218,12 +223,12 @@ function MessageBubble({ message, onSuggestionClick }: { message: Message; onSug
           : 'rounded-2xl rounded-bl-md bg-ink-800 border border-ink-600 text-ink-100'
       }`}>
         <div className="px-4 py-3 text-sm leading-relaxed">
-          <p className="whitespace-pre-wrap break-words">{message.content}</p>
+          <p className="whitespace-pre-wrap break-words">{displayContent}</p>
         </div>
 
-        {!isUser && Array.isArray(message.suggestions) && message.suggestions.length > 0 && (
+        {!isUser && displaySuggestions.length > 0 && (
           <div className="flex flex-wrap gap-2 border-t border-ink-700/80 px-3 py-3">
-            {message.suggestions.map((suggestion, index) => (
+            {displaySuggestions.map((suggestion, index) => (
               <button
                 key={`${message._id}-suggestion-${index}`}
                 type="button"
