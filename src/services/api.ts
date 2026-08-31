@@ -98,6 +98,33 @@ export const conversationApi = {
   },
 };
 
+function normalizeAssistantPayload(value: unknown): string | AssistantResponse {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return trimmed;
+
+    const stripped = trimmed
+      .replace(/^```(?:json)?/i, '')
+      .replace(/```$/i, '')
+      .trim();
+
+    try {
+      const parsed = JSON.parse(stripped);
+      return typeof parsed === 'string' ? normalizeAssistantPayload(parsed) : (parsed as AssistantResponse);
+    } catch {
+      return trimmed;
+    }
+  }
+
+  if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    if ('Response' in record) return normalizeAssistantPayload(record.Response);
+    if ('narration' in record || 'suggested_actions' in record) return record as unknown as AssistantResponse;
+  }
+
+  return typeof value === 'string' ? value : '';
+}
+
 export const messageApi = {
   async create(conversationId: string, role: string, content: string): Promise<string> {
     const data = await request<{ message: string }>(`/message/${conversationId}`, {
@@ -108,22 +135,12 @@ export const messageApi = {
     return match ? match[1] : '';
   },
   async chat(conversationId: string, content: string): Promise<string | AssistantResponse> {
-    const data = await request<{ Response?: string | AssistantResponse }>(`/chat/${conversationId}`, {
+    const data = await request<{ Response?: unknown }>(`/chat/${conversationId}`, {
       method: 'POST',
       body: JSON.stringify({ role: 'user', content }),
     });
 
-    const response = data.Response ?? data;
-    if (typeof response === 'string') {
-      try {
-        const parsed = JSON.parse(response);
-        return typeof parsed === 'string' ? parsed : (parsed as AssistantResponse);
-      } catch {
-        return response;
-      }
-    }
-
-    return response as AssistantResponse;
+    return normalizeAssistantPayload(data.Response ?? data);
   },
 };
 

@@ -5,32 +5,60 @@ import type { AssistantResponse, Message } from '@/types';
 import { TypingIndicator } from '@/components/TypingIndicator';
 import { ChevronLeft, Send, Loader2, AlertCircle } from 'lucide-react';
 
-function parseAssistantResponse(response: string | AssistantResponse | undefined): { narration: string; suggestions: string[] } {
+function parseAssistantResponse(response: string | AssistantResponse | Record<string, unknown> | undefined): { narration: string; suggestions: string[] } {
+  const extractStructured = (value: unknown): Partial<AssistantResponse> | null => {
+    if (!value || typeof value !== 'object') return null;
+
+    const record = value as Record<string, unknown>;
+    if ('narration' in record || 'suggested_actions' in record) {
+      return record as Partial<AssistantResponse>;
+    }
+    if ('Response' in record && record.Response !== undefined) {
+      return extractStructured(record.Response);
+    }
+    return null;
+  };
+
   if (!response) return { narration: '', suggestions: [] };
 
   if (typeof response === 'string') {
     const trimmed = response.trim();
     if (!trimmed) return { narration: '', suggestions: [] };
 
+    let candidate = trimmed
+      .replace(/^```(?:json)?/i, '')
+      .replace(/```$/i, '')
+      .trim();
+
     try {
-      const parsed = JSON.parse(trimmed) as Partial<AssistantResponse>;
-      return {
-        narration: typeof parsed.narration === 'string' ? parsed.narration : trimmed,
-        suggestions: Array.isArray(parsed.suggested_actions)
-          ? parsed.suggested_actions.filter((item): item is string => typeof item === 'string')
-          : [],
-      };
+      const parsed = JSON.parse(candidate) as unknown;
+      const structured = extractStructured(parsed) ?? extractStructured(candidate);
+      if (structured) {
+        return {
+          narration: typeof structured.narration === 'string' ? structured.narration : candidate,
+          suggestions: Array.isArray(structured.suggested_actions)
+            ? structured.suggested_actions.filter((item): item is string => typeof item === 'string')
+            : [],
+        };
+      }
+
+      return { narration: candidate, suggestions: [] };
     } catch {
-      return { narration: trimmed, suggestions: [] };
+      return { narration: candidate, suggestions: [] };
     }
   }
 
-  return {
-    narration: response.narration || '',
-    suggestions: Array.isArray(response.suggested_actions)
-      ? response.suggested_actions.filter((item): item is string => typeof item === 'string')
-      : [],
-  };
+  const structured = extractStructured(response);
+  if (structured) {
+    return {
+      narration: typeof structured.narration === 'string' ? structured.narration : '',
+      suggestions: Array.isArray(structured.suggested_actions)
+        ? structured.suggested_actions.filter((item): item is string => typeof item === 'string')
+        : [],
+    };
+  }
+
+  return { narration: '', suggestions: [] };
 }
 
 export function ChatScreen() {
