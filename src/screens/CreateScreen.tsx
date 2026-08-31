@@ -39,7 +39,7 @@ export function CreateScreen() {
       const title = buildTitle(form);
       const conversationId = await conversationApi.create(user._id, title);
       const content = buildContent(form);
-      await messageApi.create(conversationId, 'Initial', content);
+      await messageApi.create(conversationId, 'user', content);
       const newConversation = {
         _id: conversationId, userId: user._id, title,
         createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
