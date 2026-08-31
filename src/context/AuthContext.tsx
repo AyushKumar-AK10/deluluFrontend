@@ -72,6 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.log('[auth] profile fetched successfully', profile);
         setUser(profile);
         localStorage.setItem(STORAGE_KEY, profile.email);
+        window.history.replaceState({ screen: 'home' }, '', window.location.pathname);
         setScreen('home');
       })
       .catch((err) => {
@@ -95,6 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log('[auth] setUserEmail profile ok', profile);
       setUser(profile);
       localStorage.setItem(STORAGE_KEY, profile.email);
+      window.history.replaceState({ screen: 'home' }, '', window.location.pathname);
       setScreen('home');
     } catch (err) {
       console.error('[auth] setUserEmail failed', err);
@@ -113,7 +115,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setConversations([]); setMessages([]); setScreen('login');
   }, []);
 
-  const navigate = useCallback((s: Screen) => { setError(null); setScreen(s); }, []);
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      const nextScreen = (event.state as { screen?: Screen } | null)?.screen ?? 'home';
+      setScreen(nextScreen);
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const navigate = useCallback((s: Screen) => {
+    setError(null);
+    setScreen((prev) => {
+      if (prev === s) return prev;
+      window.history.pushState({ screen: s }, '', window.location.pathname);
+      return s;
+    });
+  }, []);
 
   const refreshConversations = useCallback(async () => {
     if (!user) return;
