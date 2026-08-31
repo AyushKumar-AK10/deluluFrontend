@@ -1,4 +1,4 @@
-import type { Conversation, Message, User } from '@/types';
+import type { AssistantResponse, Conversation, Message, User } from '@/types';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
@@ -102,12 +102,23 @@ export const messageApi = {
     const match = data.message?.match(/([0-9a-fA-F]{24})/);
     return match ? match[1] : '';
   },
-  async chat(conversationId: string, content: string): Promise<string> {
-    const data = await request<{ Response: string }>(`/chat/${conversationId}`, {
+  async chat(conversationId: string, content: string): Promise<string | AssistantResponse> {
+    const data = await request<{ Response?: string | AssistantResponse }>(`/chat/${conversationId}`, {
       method: 'POST',
-      body: JSON.stringify({ content }),
+      body: JSON.stringify({ role: 'user', content }),
     });
-    return data.Response ?? '';
+
+    const response = data.Response ?? data;
+    if (typeof response === 'string') {
+      try {
+        const parsed = JSON.parse(response);
+        return typeof parsed === 'string' ? parsed : (parsed as AssistantResponse);
+      } catch {
+        return response;
+      }
+    }
+
+    return response as AssistantResponse;
   },
 };
 

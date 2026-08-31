@@ -1,9 +1,37 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { messageApi } from '@/services/api';
-import type { Message } from '@/types';
+import type { AssistantResponse, Message } from '@/types';
 import { TypingIndicator } from '@/components/TypingIndicator';
 import { ChevronLeft, Send, Loader2, AlertCircle } from 'lucide-react';
+
+function parseAssistantResponse(response: string | AssistantResponse | undefined): { narration: string; suggestions: string[] } {
+  if (!response) return { narration: '', suggestions: [] };
+
+  if (typeof response === 'string') {
+    const trimmed = response.trim();
+    if (!trimmed) return { narration: '', suggestions: [] };
+
+    try {
+      const parsed = JSON.parse(trimmed) as Partial<AssistantResponse>;
+      return {
+        narration: typeof parsed.narration === 'string' ? parsed.narration : trimmed,
+        suggestions: Array.isArray(parsed.suggested_actions)
+          ? parsed.suggested_actions.filter((item): item is string => typeof item === 'string')
+          : [],
+      };
+    } catch {
+      return { narration: trimmed, suggestions: [] };
+    }
+  }
+
+  return {
+    narration: response.narration || '',
+    suggestions: Array.isArray(response.suggested_actions)
+      ? response.suggested_actions.filter((item): item is string => typeof item === 'string')
+      : [],
+  };
+}
 
 export function ChatScreen() {
   const { currentConversation, messages, setMessages, addMessage, navigate } = useAuth();
@@ -25,25 +53,32 @@ export function ChatScreen() {
     el.style.height = Math.min(el.scrollHeight, 120) + 'px';
   }, [input]);
 
-  const handleSend = async () => {
-    const content = input.trim();
+  const submitMessage = async (content: string) => {
     if (!content || sending || !currentConversation) return;
     setSending(true); setError(null);
 
     const tempUserMsg: Message = {
-      _id: `temp-${Date.now()}`, conversationId: currentConversation._id,
-      role: 'user', content,
-      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      _id: `temp-${Date.now()}`,
+      conversationId: currentConversation._id,
+      role: 'user',
+      content,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     };
     addMessage(tempUserMsg);
     setInput('');
 
     try {
       const response = await messageApi.chat(currentConversation._id, content);
+      const parsedResponse = parseAssistantResponse(typeof response === 'string' ? response : response ?? undefined);
       const assistantMsg: Message = {
-        _id: `res-${Date.now()}`, conversationId: currentConversation._id,
-        role: 'assistant', content: response,
-        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+        _id: `res-${Date.now()}`,
+        conversationId: currentConversation._id,
+        role: 'assistant',
+        content: parsedResponse.narration || (typeof response === 'string' ? response : ''),
+        suggestions: parsedResponse.suggestions.length ? parsedResponse.suggestions : undefined,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       };
       addMessage(assistantMsg);
     } catch (err) {
@@ -54,6 +89,17 @@ export function ChatScreen() {
       setSending(false);
       inputRef.current?.focus();
     }
+  };
+
+  const handleSend = async () => {
+    const content = input.trim();
+    if (!content) return;
+    await submitMessage(content);
+  };
+
+  const handleSuggestionClick = async (optionIndex: number) => {
+    const optionText = `Selected Option ${optionIndex}`;
+    await submitMessage(optionText);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -92,7 +138,7 @@ export function ChatScreen() {
             </div>
           )}
 
-          {messages.map((msg) => (<MessageBubble key={msg._id} message={msg} />))}
+          {messages.map((msg) => (<MessageBubble key={msg._id} message={msg} onSuggestionClick={handleSuggestionClick} />))}
 
           {sending && (
             <div className="flex justify-start animate-fade-in">
@@ -128,16 +174,34 @@ export function ChatScreen() {
   );
 }
 
-function MessageBubble({ message }: { message: Message }) {
+function MessageBubble({ message, onSuggestionClick }: { message: Message; onSuggestionClick?: (optionIndex: number) => void }) {
   const isUser = message.role === 'user';
+
   return (
     <div className={`flex animate-fade-up ${isUser ? 'justify-end' : 'justify-start'}`}>
-      <div className={`max-w-[85%] px-4 py-3 text-sm leading-relaxed ${
+      <div className={`max-w-[85%] ${
         isUser
           ? 'rounded-2xl rounded-br-md bg-accent/15 border border-accent/20 text-ink-50'
           : 'rounded-2xl rounded-bl-md bg-ink-800 border border-ink-600 text-ink-100'
       }`}>
-        <p className="whitespace-pre-wrap break-words">{message.content}</p>
+        <div className="px-4 py-3 text-sm leading-relaxed">
+          <p className="whitespace-pre-wrap break-words">{message.content}</p>
+        </div>
+
+        {!isUser && Array.isArray(message.suggestions) && message.suggestions.length > 0 && (
+          <div className="flex flex-wrap gap-2 border-t border-ink-700/80 px-3 py-3">
+            {message.suggestions.map((suggestion, index) => (
+              <button
+                key={`${message._id}-suggestion-${index}`}
+                type="button"
+                onClick={() => onSuggestionClick?.(index + 1)}
+                className="rounded-full border border-accent/30 bg-accent/10 px-2.5 py-1.5 text-[11px] font-medium text-accent hover:bg-accent/20 transition-colors"
+              >
+                {suggestion}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

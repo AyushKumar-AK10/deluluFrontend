@@ -21,8 +21,17 @@ export interface Message {
   conversationId: string;
   role: MessageRole;
   content: string;
+  suggestions?: string[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface AssistantResponse {
+  narration: string;
+  dialogue: Array<{ character: string; text: string }>;
+  suggested_actions: string[];
+  new_information: unknown[];
+  scene_status: string;
 }
 
 export interface DeluluFormData {
