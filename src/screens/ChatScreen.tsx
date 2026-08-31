@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { messageApi } from '@/services/api';
+import { conversationApi, messageApi } from '@/services/api';
 import type { AssistantResponse, Message } from '@/types';
 import { TypingIndicator } from '@/components/TypingIndicator';
 import { ChevronLeft, Send, Loader2, AlertCircle } from 'lucide-react';
@@ -37,6 +37,7 @@ export function ChatScreen() {
   const { currentConversation, messages, setMessages, addMessage, navigate } = useAuth();
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -52,6 +53,31 @@ export function ChatScreen() {
     el.style.height = 'auto';
     el.style.height = Math.min(el.scrollHeight, 120) + 'px';
   }, [input]);
+
+  useEffect(() => {
+    if (!currentConversation) return;
+    if (messages.some((m) => m.conversationId === currentConversation._id)) return;
+
+    let cancelled = false;
+    setLoadingHistory(true);
+    conversationApi.fetchMessages(currentConversation._id)
+      .then((history) => {
+        if (cancelled) return;
+        setMessages(history);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        const msg = err instanceof Error ? err.message : 'Failed to load conversation history';
+        setError(msg);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingHistory(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentConversation, messages, setMessages]);
 
   const submitMessage = async (content: string) => {
     if (!content || sending || !currentConversation) return;
@@ -132,7 +158,14 @@ export function ChatScreen() {
 
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 py-4">
         <div className="max-w-2xl mx-auto space-y-4">
-          {messages.length === 0 && !sending && (
+          {loadingHistory && (
+            <div className="flex flex-col items-center justify-center py-20 animate-fade-in">
+              <Loader2 className="h-5 w-5 text-accent animate-spin mb-3" />
+              <p className="text-ink-300 text-sm text-center max-w-xs">Loading previous chat...</p>
+            </div>
+          )}
+
+          {!loadingHistory && messages.length === 0 && !sending && (
             <div className="flex flex-col items-center justify-center py-20 animate-fade-in">
               <p className="text-ink-300 text-sm text-center max-w-xs">Your story is ready to unfold. Send a message to begin.</p>
             </div>
