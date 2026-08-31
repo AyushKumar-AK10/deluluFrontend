@@ -91,6 +91,11 @@ export const conversationApi = {
     );
     return Array.isArray(data.message) ? data.message : [];
   },
+  async delete(userId: string, conversationId: string): Promise<void> {
+    await request(`/deleteConversation/${userId}/${conversationId}`, {
+      method: 'POST',
+    });
+  },
 };
 
 export const messageApi = {

@@ -2,13 +2,14 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { conversationApi } from '@/services/api';
 import type { Conversation } from '@/types';
-import { ChevronLeft, Play, Loader2, BookOpen, Clock } from 'lucide-react';
+import { ChevronLeft, Play, Loader2, BookOpen, Clock, Trash2 } from 'lucide-react';
 
 export function ResumeScreen() {
   const { user, navigate, setCurrentConversation, setMessages, refreshConversations, conversations } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [resumingId, setResumingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -27,6 +28,20 @@ export function ResumeScreen() {
       const msg = err instanceof Error ? err.message : 'Failed to load conversation';
       setError(msg);
     } finally { setResumingId(null); }
+  };
+
+  const handleDelete = async (conv: Conversation) => {
+    if (!user) return;
+    setDeletingId(conv._id); setError(null);
+    try {
+      await conversationApi.delete(user._id, conv._id);
+      await refreshConversations();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to delete conversation';
+      setError(msg);
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const formatDate = (dateStr: string) => {
@@ -90,7 +105,17 @@ export function ResumeScreen() {
                 <div key={conv._id}
                   className="group relative rounded-2xl bg-ink-800 border border-ink-600 p-4 transition-all duration-300 hover:border-accent/20 animate-fade-up"
                   style={{ animationDelay: `${i * 0.05}s`, animationFillMode: 'both' }}>
-                  <div className="flex items-start justify-between gap-3 mb-3">
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(conv)}
+                    disabled={deletingId === conv._id || resumingId === conv._id}
+                    className="absolute top-3 right-3 flex h-8 w-8 items-center justify-center rounded-full bg-rose-500/15 text-rose-400 border border-rose-500/30 transition-colors hover:bg-rose-500/25 hover:text-rose-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                    aria-label={`Delete ${conv.title || 'conversation'}`}
+                  >
+                    {deletingId === conv._id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                  </button>
+
+                  <div className="flex items-start justify-between gap-3 mb-3 pr-9">
                     <div className="flex-1 min-w-0">
                       <h3 className="font-serif text-lg text-ink-50 leading-snug truncate">{conv.title || 'Untitled Story'}</h3>
                       <div className="flex items-center gap-1.5 mt-1.5">
@@ -99,7 +124,7 @@ export function ResumeScreen() {
                       </div>
                     </div>
                   </div>
-                  <button onClick={() => handleResume(conv)} disabled={resumingId === conv._id}
+                  <button onClick={() => handleResume(conv)} disabled={resumingId === conv._id || deletingId === conv._id}
                     className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-ink-700 text-ink-50 text-sm font-medium transition-all duration-200 hover:bg-accent hover:text-ink-900 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed">
                     {resumingId === conv._id ? (<><Loader2 className="h-4 w-4 animate-spin" /> Loading...</>)
                       : (<><Play className="h-4 w-4 fill-current" /> Resume</>)}
