@@ -1,0 +1,144 @@
+import { useState, useRef, useEffect } from 'react';
+import { useAuth } from '@/context/AuthContext';
+import { messageApi } from '@/services/api';
+import type { Message } from '@/types';
+import { TypingIndicator } from '@/components/TypingIndicator';
+import { ChevronLeft, Send, Loader2, AlertCircle } from 'lucide-react';
+
+export function ChatScreen() {
+  const { currentConversation, messages, setMessages, addMessage, navigate } = useAuth();
+  const [input, setInput] = useState('');
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, sending]);
+
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+  }, [input]);
+
+  const handleSend = async () => {
+    const content = input.trim();
+    if (!content || sending || !currentConversation) return;
+    setSending(true); setError(null);
+
+    const tempUserMsg: Message = {
+      _id: `temp-${Date.now()}`, conversationId: currentConversation._id,
+      role: 'user', content,
+      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+    };
+    addMessage(tempUserMsg);
+    setInput('');
+
+    try {
+      const response = await messageApi.chat(currentConversation._id, content);
+      const assistantMsg: Message = {
+        _id: `res-${Date.now()}`, conversationId: currentConversation._id,
+        role: 'assistant', content: response,
+        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      };
+      addMessage(assistantMsg);
+    } catch (err) {
+      setMessages((prev) => prev.filter((m) => m._id !== tempUserMsg._id));
+      const msg = err instanceof Error ? err.message : 'Failed to send message';
+      setError(msg);
+    } finally {
+      setSending(false);
+      inputRef.current?.focus();
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
+  };
+
+  if (!currentConversation) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-ink-900 px-6">
+        <p className="text-ink-300 text-sm mb-4">No conversation selected.</p>
+        <button onClick={() => navigate('home')} className="text-accent text-sm hover:text-accent-glow transition-colors">
+          Back to home
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col h-screen bg-ink-900 safe-top">
+      <div className="flex-shrink-0 bg-ink-900/80 backdrop-blur-lg border-b border-ink-700/50 px-4 py-3 flex items-center gap-3">
+        <button onClick={() => navigate('home')} className="p-2 -ml-2 text-ink-300 hover:text-ink-50 transition-colors">
+          <ChevronLeft className="h-5 w-5" />
+        </button>
+        <div className="flex-1 min-w-0">
+          <h1 className="font-serif text-lg text-ink-50 truncate leading-tight">
+            {currentConversation.title || 'Untitled Story'}
+          </h1>
+        </div>
+      </div>
+
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 py-4">
+        <div className="max-w-2xl mx-auto space-y-4">
+          {messages.length === 0 && !sending && (
+            <div className="flex flex-col items-center justify-center py-20 animate-fade-in">
+              <p className="text-ink-300 text-sm text-center max-w-xs">Your story is ready to unfold. Send a message to begin.</p>
+            </div>
+          )}
+
+          {messages.map((msg) => (<MessageBubble key={msg._id} message={msg} />))}
+
+          {sending && (
+            <div className="flex justify-start animate-fade-in">
+              <div className="rounded-2xl rounded-bl-md bg-ink-800 border border-ink-600"><TypingIndicator /></div>
+            </div>
+          )}
+
+          {error && (
+            <div className="flex items-center gap-2 text-rose text-xs px-2 animate-fade-in">
+              <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" /><span>{error}</span>
+            </div>
+          )}
+
+          <div ref={messagesEndRef} />
+        </div>
+      </div>
+
+      <div className="flex-shrink-0 bg-ink-900/80 backdrop-blur-lg border-t border-ink-700/50 px-4 pt-3 pb-3 safe-bottom-input">
+        <div className="max-w-2xl mx-auto flex items-end gap-2">
+          <div className="flex-1 relative">
+            <textarea ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown} placeholder="Continue the story..." rows={1} disabled={sending}
+              className="w-full px-4 py-3 rounded-2xl bg-ink-800 border border-ink-600 text-ink-50 text-sm placeholder:text-ink-400 outline-none focus:border-accent/40 transition-colors resize-none disabled:opacity-50"
+              style={{ maxHeight: '120px' }} />
+          </div>
+          <button onClick={handleSend} disabled={!input.trim() || sending}
+            className="flex-shrink-0 h-11 w-11 flex items-center justify-center rounded-2xl bg-accent text-ink-900 transition-all duration-200 hover:bg-accent-glow active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed">
+            {sending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MessageBubble({ message }: { message: Message }) {
+  const isUser = message.role === 'user';
+  return (
+    <div className={`flex animate-fade-up ${isUser ? 'justify-end' : 'justify-start'}`}>
+      <div className={`max-w-[85%] px-4 py-3 text-sm leading-relaxed ${
+        isUser
+          ? 'rounded-2xl rounded-br-md bg-accent/15 border border-accent/20 text-ink-50'
+          : 'rounded-2xl rounded-bl-md bg-ink-800 border border-ink-600 text-ink-100'
+      }`}>
+        <p className="whitespace-pre-wrap break-words">{message.content}</p>
+      </div>
+    </div>
+  );
+}

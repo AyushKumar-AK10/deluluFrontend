@@ -1,0 +1,64 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * { -webkit-tap-highlight-color: transparent; }
+  html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background-color: #0a0a0f;
+    color: #e4e4ec;
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overscroll-behavior: none;
+  }
+  #root { min-height: 100vh; min-height: 100dvh; }
+
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(138, 138, 160, 0.3); border-radius: 999px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(138, 138, 160, 0.5); }
+
+  input[type='range'] { -webkit-appearance: none; appearance: none; background: transparent; cursor: pointer; }
+  input[type='range']::-webkit-slider-runnable-track { height: 6px; border-radius: 999px; background: #262633; }
+  input[type='range']::-moz-range-track { height: 6px; border-radius: 999px; background: #262633; }
+  input[type='range']::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none; margin-top: -7px;
+    height: 20px; width: 20px; border-radius: 999px;
+    background: #e8b86d; border: 3px solid #0a0a0f;
+    box-shadow: 0 0 12px rgba(232, 184, 109, 0.4);
+    transition: transform 0.15s ease;
+  }
+  input[type='range']::-moz-range-thumb {
+    height: 20px; width: 20px; border-radius: 999px;
+    background: #e8b86d; border: 3px solid #0a0a0f;
+    box-shadow: 0 0 12px rgba(232, 184, 109, 0.4);
+  }
+  input[type='range']::-webkit-slider-thumb:active { transform: scale(1.15); }
+
+  input[type='number']::-webkit-inner-spin-button,
+  input[type='number']::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  input[type='number'] { -moz-appearance: textfield; }
+}
+
+@layer utilities {
+  .safe-top { padding-top: env(safe-area-inset-top); }
+  .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+  .safe-bottom-input { padding-bottom: max(env(safe-area-inset-bottom), 0px); }
+  .shimmer-bg {
+    background: linear-gradient(90deg, rgba(255,255,255,0.02) 25%, rgba(255,255,255,0.06) 50%, rgba(255,255,255,0.02) 75%);
+    background-size: 200% 100%;
+  }
+  .text-balance { text-wrap: balance; }
+  .delulu-input {
+    width: 100%; padding: 0.875rem 1rem; border-radius: 0.875rem;
+    background-color: #13131a; border: 1px solid #262633;
+    color: #e4e4ec; font-size: 0.875rem; outline: none;
+    transition: border-color 0.2s ease;
+  }
+  .delulu-input::placeholder { color: #5a5a6e; }
+  .delulu-input:focus { border-color: rgba(232, 184, 109, 0.4); }
+  .delulu-input option { background-color: #13131a; color: #e4e4ec; }
+}
