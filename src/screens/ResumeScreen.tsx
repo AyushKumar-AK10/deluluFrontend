@@ -103,13 +103,13 @@ export function ResumeScreen() {
               </p>
               {conversations.map((conv, i) => (
                 <div key={conv._id}
-                  className="group relative rounded-2xl bg-ink-800 border border-ink-600 p-4 transition-all duration-300 hover:border-accent/20 animate-fade-up"
+                  className="group relative overflow-visible rounded-2xl bg-ink-800 border border-ink-600 p-4 transition-all duration-300 hover:border-accent/20 animate-fade-up"
                   style={{ animationDelay: `${i * 0.05}s`, animationFillMode: 'both' }}>
                   <button
                     type="button"
                     onClick={() => handleDelete(conv)}
                     disabled={deletingId === conv._id || resumingId === conv._id}
-                    className="absolute top-3 right-3 flex h-8 w-8 items-center justify-center rounded-full bg-rose-500/15 text-rose-400 border border-rose-500/30 transition-colors hover:bg-rose-500/25 hover:text-rose-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="absolute top-2 right-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-rose-600 text-white border border-rose-400 shadow-md shadow-rose-900/40 transition-all hover:scale-105 hover:bg-rose-500 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                     aria-label={`Delete ${conv.title || 'conversation'}`}
                   >
                     {deletingId === conv._id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
