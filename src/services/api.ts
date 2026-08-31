@@ -20,11 +20,15 @@ class ApiError extends Error {
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const url = `${BASE}${path}`;
+  console.log('[api] request', { url, method: options.method || 'GET' });
+
   const res = await fetch(url, {
     credentials: 'include',
     headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
     ...options,
   });
+
+  console.log('[api] response status', { url, status: res.status, ok: res.ok });
 
   if (!res.ok) {
     let message = `Request failed (${res.status})`;
@@ -32,13 +36,20 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
       const body = await res.json();
       if (body?.message) message = body.message;
     } catch { /* not JSON */ }
+    console.error('[api] request error', { url, message, status: res.status });
     throw new ApiError(message, res.status);
   }
 
   const text = await res.text();
   if (!text) return {} as T;
-  try { return JSON.parse(text) as T; }
-  catch { return text as unknown as T; }
+  try {
+    const parsed = JSON.parse(text) as T;
+    console.log('[api] parsed response', { url, parsed });
+    return parsed;
+  } catch {
+    console.log('[api] plain text response', { url, text });
+    return text as unknown as T;
+  }
 }
 
 export const authApi = {

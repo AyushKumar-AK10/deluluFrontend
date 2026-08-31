@@ -10,7 +10,10 @@ export function LoginScreen() {
 
   useEffect(() => { clearError(); }, [clearError]);
 
-  const handleGoogleLogin = () => { loginWithGoogle(); };
+  const handleGoogleLogin = () => {
+    console.log('[login] clicking Google login');
+    loginWithGoogle();
+  };
 
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

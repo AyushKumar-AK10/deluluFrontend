@@ -43,41 +43,68 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const storedEmail = localStorage.getItem(STORAGE_KEY);
-    if (!storedEmail) { setScreen('login'); return; }
-
     const params = new URLSearchParams(window.location.search);
     const emailFromUrl = params.get('email');
     const email = emailFromUrl || storedEmail;
-    if (emailFromUrl) window.history.replaceState({}, '', window.location.pathname);
+
+    console.log('[auth] app init', {
+      storedEmail,
+      emailFromUrl,
+      email,
+      pathname: window.location.pathname,
+      search: window.location.search,
+    });
+
+    if (!email) {
+      console.log('[auth] no email found, setting login screen');
+      setScreen('login');
+      return;
+    }
+
+    if (emailFromUrl) {
+      console.log('[auth] clearing email query param from URL');
+      window.history.replaceState({}, '', window.location.pathname);
+    }
 
     setLoading(true);
     authApi.getProfile(email)
       .then((profile) => {
+        console.log('[auth] profile fetched successfully', profile);
         setUser(profile);
         localStorage.setItem(STORAGE_KEY, profile.email);
         setScreen('home');
       })
-      .catch(() => {
+      .catch((err) => {
+        console.error('[auth] profile fetch failed', err);
         localStorage.removeItem(STORAGE_KEY);
         setScreen('login');
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        console.log('[auth] profile request complete');
+        setLoading(false);
+      });
   }, []);
 
   const loginWithGoogle = useCallback(() => { authApi.loginWithGoogle(); }, []);
 
   const setUserEmail = useCallback(async (email: string) => {
+    console.log('[auth] setUserEmail called', email);
     setLoading(true); setError(null);
     try {
       const profile = await authApi.getProfile(email);
+      console.log('[auth] setUserEmail profile ok', profile);
       setUser(profile);
       localStorage.setItem(STORAGE_KEY, profile.email);
       setScreen('home');
     } catch (err) {
+      console.error('[auth] setUserEmail failed', err);
       const msg = err instanceof Error ? err.message : 'Failed to fetch user profile';
       setError(msg);
       throw err;
-    } finally { setLoading(false); }
+    } finally {
+      console.log('[auth] setUserEmail finished');
+      setLoading(false);
+    }
   }, []);
 
   const logout = useCallback(() => {
