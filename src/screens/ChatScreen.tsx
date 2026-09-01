@@ -84,6 +84,15 @@ export function ChatScreen() {
 
   useEffect(() => {
     if (!currentConversation) return;
+
+    const isFreshConversation = currentConversation.createdAt && currentConversation.updatedAt
+      && new Date(currentConversation.updatedAt).getTime() === new Date(currentConversation.createdAt).getTime();
+
+    if (isFreshConversation) {
+      setMessages([]);
+      return;
+    }
+
     if (messages.some((m) => m.conversationId === currentConversation._id)) return;
 
     let cancelled = false;
