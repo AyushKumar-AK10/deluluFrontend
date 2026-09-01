@@ -5,6 +5,10 @@
 @layer base {
   * { -webkit-tap-highlight-color: transparent; }
   html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+  :root {
+    --app-height: 100vh;
+  }
+
   body {
     margin: 0;
     background-color: #0a0a0f;
@@ -14,7 +18,11 @@
     -moz-osx-font-smoothing: grayscale;
     overscroll-behavior: none;
   }
-  #root { min-height: 100vh; min-height: 100dvh; }
+  #root {
+    min-height: 100vh;
+    min-height: 100dvh;
+    height: var(--app-height);
+  }
 
   ::-webkit-scrollbar { width: 4px; height: 4px; }
   ::-webkit-scrollbar-track { background: transparent; }
@@ -61,4 +69,11 @@
   .delulu-input::placeholder { color: #5a5a6e; }
   .delulu-input:focus { border-color: rgba(232, 184, 109, 0.4); }
   .delulu-input option { background-color: #13131a; color: #e4e4ec; }
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
 }

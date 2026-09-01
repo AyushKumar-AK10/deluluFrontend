@@ -301,21 +301,22 @@ export function ChatScreen() {
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [storyEnded, setStoryEnded] = useState(false);
+  const [viewportHeight, setViewportHeight] = useState<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleResize = () => {
-      const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
-      const keyboardInset = window.innerHeight - viewportHeight;
+      const nextViewportHeight = window.visualViewport?.height ?? window.innerHeight;
+      const keyboardInset = window.innerHeight - nextViewportHeight;
       const container = scrollContainerRef.current;
-      if (!container) return;
 
-      if (keyboardInset > 0) {
-        container.style.paddingBottom = `${Math.max(keyboardInset + 16, 72)}px`;
-      } else {
-        container.style.paddingBottom = '16px';
+      document.documentElement.style.setProperty('--app-height', `${nextViewportHeight}px`);
+      setViewportHeight(nextViewportHeight);
+
+      if (container) {
+        container.style.paddingBottom = keyboardInset > 0 ? `${Math.max(keyboardInset + 16, 72)}px` : '16px';
       }
     };
 
@@ -464,7 +465,7 @@ export function ChatScreen() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-ink-900 safe-top">
+    <div className="flex flex-col bg-ink-900 safe-top" style={viewportHeight ? { height: `${viewportHeight}px` } : undefined}>
       <div className="flex-shrink-0 bg-ink-900/80 backdrop-blur-lg border-b border-ink-700/50 px-4 py-3 flex items-center gap-3">
         <button onClick={() => navigate('home')} className="p-2 -ml-2 text-ink-300 hover:text-ink-50 transition-colors">
           <ChevronLeft className="h-5 w-5" />
@@ -521,7 +522,7 @@ export function ChatScreen() {
             <div className="flex-1 relative">
               <textarea ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown} placeholder="Continue the story..." rows={1} disabled={sending}
-                className="w-full px-4 py-3 rounded-2xl bg-ink-800 border border-ink-600 text-ink-50 text-sm placeholder:text-ink-400 outline-none focus:border-accent/40 transition-colors resize-none disabled:opacity-50"
+                className="w-full px-4 py-3 rounded-2xl bg-ink-800 border border-ink-600 text-ink-50 text-sm placeholder:text-ink-400 outline-none focus:border-accent/40 transition-colors resize-none disabled:opacity-50 scrollbar-none"
                 style={{ maxHeight: '120px' }} />
             </div>
             <button onClick={handleSend} disabled={!input.trim() || sending}
