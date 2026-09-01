@@ -250,8 +250,7 @@ export function ChatScreen() {
   useEffect(() => {
     if (!currentConversation) return;
 
-    const isFreshConversation = currentConversation.createdAt && currentConversation.updatedAt
-      && new Date(currentConversation.updatedAt).getTime() === new Date(currentConversation.createdAt).getTime();
+    const isFreshConversation = sessionStorage.getItem('delulu_fresh_conversation') === currentConversation._id;
 
     if (isFreshConversation) {
       return;
@@ -293,6 +292,7 @@ export function ChatScreen() {
       updatedAt: new Date().toISOString(),
     };
     addMessage(tempUserMsg);
+    sessionStorage.removeItem('delulu_fresh_conversation');
     setInput('');
 
     try {

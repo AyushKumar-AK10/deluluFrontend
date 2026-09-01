@@ -76,6 +76,7 @@ export function CreateScreen() {
         _id: newConversationId, userId: user._id, title,
         createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
       };
+      sessionStorage.setItem('delulu_fresh_conversation', newConversationId);
       setCurrentConversation(newConversation);
       setMessages([]);
       setError(null);
