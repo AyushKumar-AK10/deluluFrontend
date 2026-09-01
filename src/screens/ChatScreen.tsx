@@ -89,7 +89,6 @@ export function ChatScreen() {
       && new Date(currentConversation.updatedAt).getTime() === new Date(currentConversation.createdAt).getTime();
 
     if (isFreshConversation) {
-      setMessages([]);
       return;
     }
 
