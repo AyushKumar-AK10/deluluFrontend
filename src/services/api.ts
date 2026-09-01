@@ -126,6 +126,10 @@ function normalizeAssistantPayload(value: unknown): string | AssistantResponse {
   return typeof value === 'string' ? value : '';
 }
 
+function isMongoObjectId(value: unknown): value is string {
+  return typeof value === 'string' && /^[0-9a-fA-F]{24}$/.test(value);
+}
+
 function extractMongoId(payload: unknown, preferredKeys: string[]): string {
   if (!payload || typeof payload !== 'object') return '';
 
@@ -133,19 +137,36 @@ function extractMongoId(payload: unknown, preferredKeys: string[]): string {
 
   for (const key of preferredKeys) {
     const value = record[key];
-    if (typeof value === 'string' && /^[0-9a-fA-F]{24}$/.test(value)) return value;
-    if (typeof value === 'object' && value && '_id' in (value as Record<string, unknown>)) {
-      const nestedId = (value as Record<string, unknown>)._id;
-      if (typeof nestedId === 'string' && /^[0-9a-fA-F]{24}$/.test(nestedId)) return nestedId;
+    if (isMongoObjectId(value)) return value;
+
+    if (value && typeof value === 'object') {
+      const nestedId = (value as Record<string, unknown>)._id ?? (value as Record<string, unknown>).id;
+      if (isMongoObjectId(nestedId)) return nestedId;
     }
   }
 
-  const messageText = typeof record.message === 'string' ? record.message : '';
-  if (messageText) {
-    const match = messageText.match(/with\s+([0-9a-fA-F]{24})\s+id\s+has\s+been\s+created/i);
-    if (match?.[1]) return match[1];
-    const fallback = messageText.match(/([0-9a-fA-F]{24})/);
-    if (fallback?.[1]) return fallback[1];
+  const nestedCandidates = [
+    record.result,
+    record.data,
+    record.conversation,
+    record.message,
+    record.conversationData,
+    record.doc,
+    record.document,
+  ];
+
+  for (const candidate of nestedCandidates) {
+    if (!candidate) continue;
+
+    if (isMongoObjectId(candidate)) return candidate;
+
+    if (typeof candidate === 'object') {
+      const nested = candidate as Record<string, unknown>;
+      for (const key of ['_id', 'id', 'conversationId', 'messageId']) {
+        const id = nested[key];
+        if (isMongoObjectId(id)) return id;
+      }
+    }
   }
 
   return '';
