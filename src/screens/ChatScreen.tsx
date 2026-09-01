@@ -320,14 +320,16 @@ const isLastAssistantMessageEnded = (messageList: Message[]) => {
   }
 
   const parsed = parseAssistantResponse(lastAssistantMessage.content);
+  const isEnding = ['ending', 'end'].includes(parsed.sceneStatus.toLowerCase());
+
   console.log('[chat] end-check', {
     messageId: lastAssistantMessage._id,
     rawContent: lastAssistantMessage.content,
     parsedSceneStatus: parsed.sceneStatus,
-    normalizedToEnd: parsed.sceneStatus.toLowerCase() === 'end',
+    normalizedToEnd: isEnding,
   });
 
-  return parsed.sceneStatus.toLowerCase() === 'end';
+  return isEnding;
 };
 
 export function ChatScreen() {
@@ -479,7 +481,7 @@ export function ChatScreen() {
         new_information: parsedResponse.newInformation,
         scene_status: parsedResponse.sceneStatus,
       });
-      setStoryEnded(parsedResponse.sceneStatus.toLowerCase() === 'end');
+      setStoryEnded(['ending', 'end'].includes(parsedResponse.sceneStatus.toLowerCase()));
       const assistantMsg: Message = {
         _id: `res-${Date.now()}`,
         conversationId: currentConversation._id,
@@ -621,7 +623,7 @@ function MessageBubble({ message, onSuggestionClick }: { message: Message; onSug
   const displayContent = parsedAssistant?.narration || message.content;
   const displayDialogue = parsedAssistant?.dialogue ?? [];
   const displayNewInformation = parsedAssistant?.newInformation ?? [];
-  const isEndedState = !isUser && parsedAssistant?.sceneStatus?.toLowerCase() === 'end';
+  const isEndedState = !isUser && ['ending', 'end'].includes(parsedAssistant?.sceneStatus?.toLowerCase?.() ?? '');
   const displaySuggestions = (message.suggestions && message.suggestions.length > 0)
     ? message.suggestions
     : (parsedAssistant?.suggestions ?? []);
