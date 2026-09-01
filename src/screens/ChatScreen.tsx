@@ -19,10 +19,25 @@ function parseAssistantResponse(response: string | AssistantResponse | Record<st
       const match = trimmed.match(/^([^:]+?)\s*:\s*(.+)$/);
       if (!match) return null;
 
-      const character = match[1].trim();
-      const text = match[2].trim();
-      if (!character || !text) return null;
-      return { character, text };
+      const firstSegment = match[1].trim();
+      const remainder = match[2].trim();
+      if (!firstSegment || !remainder) return null;
+
+      if (/^narrator$/i.test(firstSegment)) {
+        const nested = splitCharacterText(remainder);
+        if (nested) return nested;
+      }
+
+      const nestedMatch = remainder.match(/^([^:]+?)\s*:\s*(.+)$/);
+      if (nestedMatch && !/^narrator$/i.test(firstSegment)) {
+        const nestedCharacter = nestedMatch[1].trim();
+        const nestedText = nestedMatch[2].trim();
+        if (nestedCharacter && nestedText) {
+          return { character: nestedCharacter, text: nestedText };
+        }
+      }
+
+      return { character: firstSegment, text: remainder };
     };
 
     const extractDialogueEntry = (record: Record<string, unknown>): { character: string; text: string } | null => {
