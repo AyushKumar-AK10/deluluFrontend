@@ -71,13 +71,13 @@ export const authApi = {
 
 export const conversationApi = {
   async create(userId: string, title: string): Promise<string> {
-    const data = await request<{ message: string }>(`/user/${userId}`, {
+    const data = await request<{ message?: string; conversationId?: string; _id?: string; id?: string }>(`/user/${userId}`, {
       method: 'POST',
       body: JSON.stringify({ title }),
     });
-    const match = data.message?.match(/([0-9a-fA-F]{24})/);
-    if (!match) throw new ApiError('Could not parse conversation id', 500);
-    return match[1];
+    const id = extractMongoId(data, ['conversationId', '_id', 'id']);
+    if (!id) throw new ApiError('Could not parse conversation id', 500);
+    return id;
   },
   async fetchAll(userId: string): Promise<Conversation[]> {
     const data = await request<{ message: Conversation[] }>(
@@ -125,14 +125,38 @@ function normalizeAssistantPayload(value: unknown): string | AssistantResponse {
   return typeof value === 'string' ? value : '';
 }
 
+function extractMongoId(payload: unknown, preferredKeys: string[]): string {
+  if (!payload || typeof payload !== 'object') return '';
+
+  const record = payload as Record<string, unknown>;
+
+  for (const key of preferredKeys) {
+    const value = record[key];
+    if (typeof value === 'string' && /^[0-9a-fA-F]{24}$/.test(value)) return value;
+    if (typeof value === 'object' && value && '_id' in (value as Record<string, unknown>)) {
+      const nestedId = (value as Record<string, unknown>)._id;
+      if (typeof nestedId === 'string' && /^[0-9a-fA-F]{24}$/.test(nestedId)) return nestedId;
+    }
+  }
+
+  const messageText = typeof record.message === 'string' ? record.message : '';
+  if (messageText) {
+    const match = messageText.match(/with\s+([0-9a-fA-F]{24})\s+id\s+has\s+been\s+created/i);
+    if (match?.[1]) return match[1];
+    const fallback = messageText.match(/([0-9a-fA-F]{24})/);
+    if (fallback?.[1]) return fallback[1];
+  }
+
+  return '';
+}
+
 export const messageApi = {
   async create(conversationId: string, role: string, content: string): Promise<string> {
-    const data = await request<{ message: string }>(`/message/${conversationId}`, {
+    const data = await request<{ message?: string; messageId?: string; _id?: string; id?: string }>(`/message/${conversationId}`, {
       method: 'POST',
       body: JSON.stringify({ role, content }),
     });
-    const match = data.message?.match(/([0-9a-fA-F]{24})/);
-    return match ? match[1] : '';
+    return extractMongoId(data, ['messageId', '_id', 'id']) || '';
   },
   async chat(conversationId: string, content: string): Promise<string | AssistantResponse> {
     const data = await request<{ Response?: unknown }>(`/chat/${conversationId}`, {
