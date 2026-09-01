@@ -5,12 +5,62 @@ import type { AssistantResponse, Message } from '@/types';
 import { TypingIndicator } from '@/components/TypingIndicator';
 import { ChevronLeft, Send, Loader2, AlertCircle } from 'lucide-react';
 
-function parseAssistantResponse(response: string | AssistantResponse | Record<string, unknown> | undefined): { narration: string; suggestions: string[] } {
+function parseAssistantResponse(response: string | AssistantResponse | Record<string, unknown> | undefined): {
+  narration: string;
+  dialogue: Array<{ character: string; text: string }>;
+  suggestions: string[];
+  newInformation: string[];
+} {
+  const normalizeDialogue = (value: unknown): Array<{ character: string; text: string }> => {
+    if (!Array.isArray(value)) return [];
+
+    return value
+      .map((entry) => {
+        if (!entry || typeof entry !== 'object') return null;
+        const record = entry as Record<string, unknown>;
+        const character = typeof record.character === 'string'
+          ? record.character
+          : typeof record.Character === 'string'
+            ? record.Character
+            : typeof record.name === 'string'
+              ? record.name
+              : 'Narrator';
+        const text = typeof record.text === 'string'
+          ? record.text
+          : typeof record.Text === 'string'
+            ? record.Text
+            : typeof record.dialogue === 'string'
+              ? record.dialogue
+              : '';
+
+        return text ? { character, text } : null;
+      })
+      .filter((entry): entry is { character: string; text: string } => entry !== null);
+  };
+
+  const normalizeNewInformation = (value: unknown): string[] => {
+    if (!Array.isArray(value)) return [];
+
+    return value
+      .map((entry) => {
+        if (typeof entry === 'string') return entry;
+        if (entry && typeof entry === 'object') {
+          try {
+            return JSON.stringify(entry, null, 2);
+          } catch {
+            return String(entry);
+          }
+        }
+        return entry === null || entry === undefined ? '' : String(entry);
+      })
+      .filter((entry): entry is string => entry.trim().length > 0);
+  };
+
   const extractStructured = (value: unknown): Partial<AssistantResponse> | null => {
     if (!value || typeof value !== 'object') return null;
 
     const record = value as Record<string, unknown>;
-    if ('narration' in record || 'suggested_actions' in record) {
+    if ('narration' in record || 'suggested_actions' in record || 'dialogue' in record || 'new_information' in record) {
       return record as Partial<AssistantResponse>;
     }
     if ('Response' in record && record.Response !== undefined) {
@@ -19,13 +69,13 @@ function parseAssistantResponse(response: string | AssistantResponse | Record<st
     return null;
   };
 
-  if (!response) return { narration: '', suggestions: [] };
+  if (!response) return { narration: '', dialogue: [], suggestions: [], newInformation: [] };
 
   if (typeof response === 'string') {
     const trimmed = response.trim();
-    if (!trimmed) return { narration: '', suggestions: [] };
+    if (!trimmed) return { narration: '', dialogue: [], suggestions: [], newInformation: [] };
 
-    let candidate = trimmed
+    const candidate = trimmed
       .replace(/^```(?:json)?/i, '')
       .replace(/```$/i, '')
       .trim();
@@ -36,15 +86,17 @@ function parseAssistantResponse(response: string | AssistantResponse | Record<st
       if (structured) {
         return {
           narration: typeof structured.narration === 'string' ? structured.narration : candidate,
+          dialogue: normalizeDialogue(structured.dialogue),
           suggestions: Array.isArray(structured.suggested_actions)
             ? structured.suggested_actions.filter((item): item is string => typeof item === 'string')
             : [],
+          newInformation: normalizeNewInformation(structured.new_information),
         };
       }
 
-      return { narration: candidate, suggestions: [] };
+      return { narration: candidate, dialogue: [], suggestions: [], newInformation: [] };
     } catch {
-      return { narration: candidate, suggestions: [] };
+      return { narration: candidate, dialogue: [], suggestions: [], newInformation: [] };
     }
   }
 
@@ -52,13 +104,15 @@ function parseAssistantResponse(response: string | AssistantResponse | Record<st
   if (structured) {
     return {
       narration: typeof structured.narration === 'string' ? structured.narration : '',
+      dialogue: normalizeDialogue(structured.dialogue),
       suggestions: Array.isArray(structured.suggested_actions)
         ? structured.suggested_actions.filter((item): item is string => typeof item === 'string')
         : [],
+      newInformation: normalizeNewInformation(structured.new_information),
     };
   }
 
-  return { narration: '', suggestions: [] };
+  return { narration: '', dialogue: [], suggestions: [], newInformation: [] };
 }
 
 export function ChatScreen() {
@@ -157,11 +211,17 @@ export function ChatScreen() {
     try {
       const response = await messageApi.chat(currentConversation._id, content);
       const parsedResponse = parseAssistantResponse(typeof response === 'string' ? response : response ?? undefined);
+      const fullAssistantContent = JSON.stringify({
+        narration: parsedResponse.narration,
+        dialogue: parsedResponse.dialogue,
+        suggested_actions: parsedResponse.suggestions,
+        new_information: parsedResponse.newInformation,
+      });
       const assistantMsg: Message = {
         _id: `res-${Date.now()}`,
         conversationId: currentConversation._id,
         role: 'assistant',
-        content: parsedResponse.narration || (typeof response === 'string' ? response : ''),
+        content: fullAssistantContent,
         suggestions: parsedResponse.suggestions.length ? parsedResponse.suggestions : undefined,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -183,9 +243,9 @@ export function ChatScreen() {
     await submitMessage(content);
   };
 
-  const handleSuggestionClick = async (optionIndex: number) => {
-    const optionText = `Selected Option ${optionIndex}`;
-    await submitMessage(optionText);
+  const handleSuggestionClick = async (optionIndex: number, optionText?: string) => {
+    const selectedText = optionText || `Selected Option ${optionIndex}`;
+    await submitMessage(selectedText);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -273,10 +333,12 @@ export function ChatScreen() {
   );
 }
 
-function MessageBubble({ message, onSuggestionClick }: { message: Message; onSuggestionClick?: (optionIndex: number) => void }) {
+function MessageBubble({ message, onSuggestionClick }: { message: Message; onSuggestionClick?: (optionIndex: number, optionText?: string) => void }) {
   const isUser = message.role === 'user';
   const parsedAssistant = !isUser ? parseAssistantResponse(message.content) : null;
   const displayContent = parsedAssistant?.narration || message.content;
+  const displayDialogue = parsedAssistant?.dialogue ?? [];
+  const displayNewInformation = parsedAssistant?.newInformation ?? [];
   const displaySuggestions = (message.suggestions && message.suggestions.length > 0)
     ? message.suggestions
     : (parsedAssistant?.suggestions ?? []);
@@ -288,9 +350,39 @@ function MessageBubble({ message, onSuggestionClick }: { message: Message; onSug
           ? 'rounded-2xl rounded-br-md bg-accent/15 border border-accent/20 text-ink-50'
           : 'rounded-2xl rounded-bl-md bg-ink-800 border border-ink-600 text-ink-100'
       }`}>
-        <div className="px-4 py-3 text-sm leading-relaxed">
-          <p className="whitespace-pre-wrap break-words">{displayContent}</p>
-        </div>
+        {!isUser && (
+          <div className="px-4 py-3 text-sm leading-relaxed space-y-3">
+            <p className="whitespace-pre-wrap break-words">{displayContent}</p>
+
+            {displayDialogue.length > 0 && (
+              <div className="space-y-2 border-t border-ink-700/80 pt-2">
+                {displayDialogue.map((line, index) => (
+                  <div key={`${message._id}-dialogue-${index}`} className="text-xs leading-relaxed">
+                    <span className="font-medium text-accent">{line.character}:</span>{' '}
+                    <span className="text-ink-200">{line.text}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {displayNewInformation.length > 0 && (
+              <div className="rounded-xl border border-amber-400/30 bg-amber-500/5 px-3 py-2">
+                <p className="mb-2 text-[10px] font-medium uppercase tracking-[0.18em] text-amber-300">New Information</p>
+                <ul className="space-y-1 text-xs text-ink-200 leading-relaxed">
+                  {displayNewInformation.map((info, index) => (
+                    <li key={`${message._id}-new-info-${index}`} className="whitespace-pre-wrap break-words">• {info}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+
+        {isUser && (
+          <div className="px-4 py-3 text-sm leading-relaxed">
+            <p className="whitespace-pre-wrap break-words">{message.content}</p>
+          </div>
+        )}
 
         {!isUser && displaySuggestions.length > 0 && (
           <div className="flex flex-wrap gap-2 border-t border-ink-700/80 px-3 py-3">
@@ -298,7 +390,7 @@ function MessageBubble({ message, onSuggestionClick }: { message: Message; onSug
               <button
                 key={`${message._id}-suggestion-${index}`}
                 type="button"
-                onClick={() => onSuggestionClick?.(index + 1)}
+                onClick={() => onSuggestionClick?.(index + 1, suggestion)}
                 className="rounded-full border border-accent/30 bg-accent/10 px-2.5 py-1.5 text-[11px] font-medium text-accent hover:bg-accent/20 transition-colors"
               >
                 {suggestion}
