@@ -211,7 +211,7 @@ function parseAssistantResponse(response: string | AssistantResponse | Record<st
     if (!value || typeof value !== 'object') return null;
 
     const record = value as Record<string, unknown>;
-    const candidateKeys = ['narration', 'suggested_actions', 'suggestedActions', 'dialogue', 'dialogueLine', 'new_information', 'newInformation', 'newInfo', 'characters', 'Characters'];
+    const candidateKeys = ['narration', 'suggested_actions', 'suggestedActions', 'dialogue', 'dialogueLine', 'new_information', 'newInformation', 'newInfo', 'characters', 'Characters', 'scene_status', 'sceneStatus'];
     if (candidateKeys.some((key) => key in record)) {
       return record as Partial<AssistantResponse>;
     }
@@ -339,6 +339,21 @@ export function ChatScreen() {
     el.style.height = 'auto';
     el.style.height = Math.min(el.scrollHeight, 120) + 'px';
   }, [input]);
+
+  useEffect(() => {
+    if (!currentConversation) {
+      setStoryEnded(false);
+      return;
+    }
+
+    const ended = messages.some((msg) => {
+      if (msg.role !== 'assistant') return false;
+      const parsed = parseAssistantResponse(msg.content);
+      return parsed.sceneStatus.toLowerCase() === 'end';
+    });
+
+    setStoryEnded(ended);
+  }, [currentConversation, messages]);
 
   useEffect(() => {
     if (!currentConversation) return;
