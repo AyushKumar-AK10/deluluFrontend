@@ -309,7 +309,7 @@ export function ChatScreen() {
   useEffect(() => {
     const handleResize = () => {
       const nextViewportHeight = window.visualViewport?.height ?? window.innerHeight;
-      const keyboardInset = window.innerHeight - nextViewportHeight;
+      const keyboardInset = Math.max(0, window.innerHeight - nextViewportHeight);
       const container = scrollContainerRef.current;
 
       document.documentElement.style.setProperty('--app-height', `${nextViewportHeight}px`);
@@ -317,6 +317,12 @@ export function ChatScreen() {
 
       if (container) {
         container.style.paddingBottom = keyboardInset > 0 ? `${Math.max(keyboardInset + 16, 72)}px` : '16px';
+      }
+
+      if (document.activeElement === inputRef.current) {
+        requestAnimationFrame(() => {
+          inputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        });
       }
     };
 
@@ -337,8 +343,16 @@ export function ChatScreen() {
   useEffect(() => {
     const el = inputRef.current;
     if (!el) return;
+
+    const maxHeight = 120;
     el.style.height = 'auto';
-    el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+    const nextHeight = Math.min(el.scrollHeight, maxHeight);
+    el.style.height = `${nextHeight}px`;
+    el.style.overflowY = el.scrollHeight > maxHeight ? 'auto' : 'hidden';
+
+    if (document.activeElement === el) {
+      requestAnimationFrame(() => el.scrollIntoView({ behavior: 'smooth', block: 'end' }));
+    }
   }, [input]);
 
   useEffect(() => {
@@ -521,9 +535,10 @@ export function ChatScreen() {
           <div className="max-w-2xl mx-auto flex items-end gap-2">
             <div className="flex-1 relative">
               <textarea ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyDown} placeholder="Continue the story..." rows={1} disabled={sending}
+                onKeyDown={handleKeyDown} onFocus={() => inputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })}
+                placeholder="Continue the story..." rows={1} disabled={sending}
                 className="w-full px-4 py-3 rounded-2xl bg-ink-800 border border-ink-600 text-ink-50 text-sm placeholder:text-ink-400 outline-none focus:border-accent/40 transition-colors resize-none disabled:opacity-50 scrollbar-none"
-                style={{ maxHeight: '120px' }} />
+                style={{ maxHeight: '120px', overflowY: 'hidden' }} />
             </div>
             <button onClick={handleSend} disabled={!input.trim() || sending}
               className="flex-shrink-0 h-11 w-11 flex items-center justify-center rounded-2xl bg-accent text-ink-900 transition-all duration-200 hover:bg-accent-glow active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed">
