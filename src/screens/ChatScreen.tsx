@@ -10,6 +10,7 @@ function parseAssistantResponse(response: string | AssistantResponse | Record<st
   dialogue: Array<{ character: string; text: string }>;
   suggestions: string[];
   newInformation: string[];
+  sceneStatus: string;
 } {
   const normalizeDialogue = (value: unknown): Array<{ character: string; text: string }> => {
     const splitCharacterText = (raw: string): { character: string; text: string } | null => {
@@ -83,12 +84,16 @@ function parseAssistantResponse(response: string | AssistantResponse | Record<st
 
       if (!candidateText.trim()) return null;
 
+      const textSplit = splitCharacterText(candidateText);
+      if (/^narrator$/i.test(candidateCharacter.trim()) && textSplit) {
+        return textSplit;
+      }
+
       if (candidateCharacter.trim()) {
         return { character: candidateCharacter.trim(), text: candidateText.trim() };
       }
 
-      const split = splitCharacterText(candidateText);
-      if (split) return split;
+      if (textSplit) return textSplit;
 
       return { character: 'Narrator', text: candidateText.trim() };
     };
@@ -219,11 +224,11 @@ function parseAssistantResponse(response: string | AssistantResponse | Record<st
     return null;
   };
 
-  if (!response) return { narration: '', dialogue: [], suggestions: [], newInformation: [] };
+  if (!response) return { narration: '', dialogue: [], suggestions: [], newInformation: [], sceneStatus: 'continue' };
 
   if (typeof response === 'string') {
     const trimmed = response.trim();
-    if (!trimmed) return { narration: '', dialogue: [], suggestions: [], newInformation: [] };
+    if (!trimmed) return { narration: '', dialogue: [], suggestions: [], newInformation: [], sceneStatus: 'continue' };
 
     const candidate = trimmed
       .replace(/^```(?:json)?/i, '')
@@ -248,12 +253,17 @@ function parseAssistantResponse(response: string | AssistantResponse | Record<st
             ? structured.suggested_actions.filter((item): item is string => typeof item === 'string')
             : [],
           newInformation: normalizeNewInformation(structured.new_information ?? (structured as Record<string, unknown>).newInformation ?? (structured as Record<string, unknown>).newInfo),
+          sceneStatus: typeof structured.scene_status === 'string'
+            ? structured.scene_status
+            : typeof (structured as Record<string, unknown>).sceneStatus === 'string'
+              ? (structured as Record<string, unknown>).sceneStatus as string
+              : 'continue',
         };
       }
 
-      return { narration: candidate, dialogue: [], suggestions: [], newInformation: [] };
+      return { narration: candidate, dialogue: [], suggestions: [], newInformation: [], sceneStatus: 'continue' };
     } catch {
-      return { narration: candidate, dialogue: [], suggestions: [], newInformation: [] };
+      return { narration: candidate, dialogue: [], suggestions: [], newInformation: [], sceneStatus: 'continue' };
     }
   }
 
@@ -273,10 +283,15 @@ function parseAssistantResponse(response: string | AssistantResponse | Record<st
         ? structured.suggested_actions.filter((item): item is string => typeof item === 'string')
         : [],
       newInformation: normalizeNewInformation(structured.new_information ?? (structured as Record<string, unknown>).newInformation ?? (structured as Record<string, unknown>).newInfo),
+      sceneStatus: typeof structured.scene_status === 'string'
+        ? structured.scene_status
+        : typeof (structured as Record<string, unknown>).sceneStatus === 'string'
+          ? (structured as Record<string, unknown>).sceneStatus as string
+          : 'continue',
     };
   }
 
-  return { narration: '', dialogue: [], suggestions: [], newInformation: [] };
+  return { narration: '', dialogue: [], suggestions: [], newInformation: [], sceneStatus: 'continue' };
 }
 
 export function ChatScreen() {
@@ -285,6 +300,7 @@ export function ChatScreen() {
   const [sending, setSending] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [storyEnded, setStoryEnded] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -380,7 +396,9 @@ export function ChatScreen() {
         dialogue: parsedResponse.dialogue,
         suggested_actions: parsedResponse.suggestions,
         new_information: parsedResponse.newInformation,
+        scene_status: parsedResponse.sceneStatus,
       });
+      setStoryEnded(parsedResponse.sceneStatus.toLowerCase() === 'end');
       const assistantMsg: Message = {
         _id: `res-${Date.now()}`,
         conversationId: currentConversation._id,
@@ -479,20 +497,32 @@ export function ChatScreen() {
         </div>
       </div>
 
-      <div className="flex-shrink-0 bg-ink-900/80 backdrop-blur-lg border-t border-ink-700/50 px-4 pt-3 pb-[max(env(safe-area-inset-bottom),12px)] safe-bottom-input">
-        <div className="max-w-2xl mx-auto flex items-end gap-2">
-          <div className="flex-1 relative">
-            <textarea ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown} placeholder="Continue the story..." rows={1} disabled={sending}
-              className="w-full px-4 py-3 rounded-2xl bg-ink-800 border border-ink-600 text-ink-50 text-sm placeholder:text-ink-400 outline-none focus:border-accent/40 transition-colors resize-none disabled:opacity-50"
-              style={{ maxHeight: '120px' }} />
+      {!storyEnded && (
+        <div className="flex-shrink-0 bg-ink-900/80 backdrop-blur-lg border-t border-ink-700/50 px-4 pt-3 pb-[max(env(safe-area-inset-bottom),12px)] safe-bottom-input">
+          <div className="max-w-2xl mx-auto flex items-end gap-2">
+            <div className="flex-1 relative">
+              <textarea ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown} placeholder="Continue the story..." rows={1} disabled={sending}
+                className="w-full px-4 py-3 rounded-2xl bg-ink-800 border border-ink-600 text-ink-50 text-sm placeholder:text-ink-400 outline-none focus:border-accent/40 transition-colors resize-none disabled:opacity-50"
+                style={{ maxHeight: '120px' }} />
+            </div>
+            <button onClick={handleSend} disabled={!input.trim() || sending}
+              className="flex-shrink-0 h-11 w-11 flex items-center justify-center rounded-2xl bg-accent text-ink-900 transition-all duration-200 hover:bg-accent-glow active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed">
+              {sending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
+            </button>
           </div>
-          <button onClick={handleSend} disabled={!input.trim() || sending}
-            className="flex-shrink-0 h-11 w-11 flex items-center justify-center rounded-2xl bg-accent text-ink-900 transition-all duration-200 hover:bg-accent-glow active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed">
-            {sending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
-          </button>
         </div>
-      </div>
+      )}
+
+      {storyEnded && (
+        <div className="flex-shrink-0 bg-ink-900/80 backdrop-blur-lg border-t border-ink-700/50 px-4 pt-3 pb-[max(env(safe-area-inset-bottom),12px)] safe-bottom-input">
+          <div className="max-w-2xl mx-auto">
+            <div className="rounded-2xl border border-rose/30 bg-rose/10 px-4 py-3 text-center text-sm font-medium text-rose-200">
+              Delulu Ended
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -503,6 +533,7 @@ function MessageBubble({ message, onSuggestionClick }: { message: Message; onSug
   const displayContent = parsedAssistant?.narration || message.content;
   const displayDialogue = parsedAssistant?.dialogue ?? [];
   const displayNewInformation = parsedAssistant?.newInformation ?? [];
+  const isEndedState = !isUser && parsedAssistant?.sceneStatus?.toLowerCase() === 'end';
   const displaySuggestions = (message.suggestions && message.suggestions.length > 0)
     ? message.suggestions
     : (parsedAssistant?.suggestions ?? []);
@@ -516,6 +547,12 @@ function MessageBubble({ message, onSuggestionClick }: { message: Message; onSug
       }`}>
         {!isUser && (
           <div className="px-4 py-3 text-sm leading-relaxed space-y-3">
+            {isEndedState && (
+              <div className="rounded-xl border border-rose/30 bg-rose/10 px-3 py-2 text-xs font-medium uppercase tracking-[0.18em] text-rose-200">
+                Delulu Ended
+              </div>
+            )}
+
             <p className="whitespace-pre-wrap break-words">{displayContent}</p>
 
             {displayDialogue.length > 0 && (
