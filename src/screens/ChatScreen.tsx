@@ -16,21 +16,48 @@ function parseAssistantResponse(response: string | AssistantResponse | Record<st
 
     return value
       .map((entry) => {
+        if (typeof entry === 'string') {
+          return { character: 'Narrator', text: entry };
+        }
+
         if (!entry || typeof entry !== 'object') return null;
         const record = entry as Record<string, unknown>;
-        const character = typeof record.character === 'string'
-          ? record.character
-          : typeof record.Character === 'string'
-            ? record.Character
-            : typeof record.name === 'string'
-              ? record.name
-              : 'Narrator';
+
+        if ('character' in record || 'Character' in record || 'name' in record || 'Name' in record) {
+          const character = typeof record.character === 'string'
+            ? record.character
+            : typeof record.Character === 'string'
+              ? record.Character
+              : typeof record.name === 'string'
+                ? record.name
+                : typeof record.Name === 'string'
+                  ? record.Name
+                  : 'Narrator';
+
+          const text = typeof record.text === 'string'
+            ? record.text
+            : typeof record.Text === 'string'
+              ? record.Text
+              : typeof record.dialogue === 'string'
+                ? record.dialogue
+                : typeof record.speech === 'string'
+                  ? record.speech
+                  : '';
+
+          return text ? { character, text } : null;
+        }
+
+        const character = typeof record.characterName === 'string'
+          ? record.characterName
+          : typeof record.CharacterName === 'string'
+            ? record.CharacterName
+            : 'Narrator';
         const text = typeof record.text === 'string'
           ? record.text
           : typeof record.Text === 'string'
             ? record.Text
-            : typeof record.dialogue === 'string'
-              ? record.dialogue
+            : typeof record.value === 'string'
+              ? record.value
               : '';
 
         return text ? { character, text } : null;
@@ -39,7 +66,15 @@ function parseAssistantResponse(response: string | AssistantResponse | Record<st
   };
 
   const normalizeNewInformation = (value: unknown): string[] => {
-    if (!Array.isArray(value)) return [];
+    if (!Array.isArray(value)) {
+      if (typeof value === 'string') return value.trim() ? [value.trim()] : [];
+      if (value && typeof value === 'object') {
+        return Object.entries(value as Record<string, unknown>)
+          .map(([, nestedValue]) => typeof nestedValue === 'string' ? nestedValue : JSON.stringify(nestedValue))
+          .filter((entry): entry is string => entry.trim().length > 0);
+      }
+      return [];
+    }
 
     return value
       .map((entry) => {
@@ -60,7 +95,10 @@ function parseAssistantResponse(response: string | AssistantResponse | Record<st
     if (!value || typeof value !== 'object') return null;
 
     const record = value as Record<string, unknown>;
-    if ('narration' in record || 'suggested_actions' in record || 'dialogue' in record || 'new_information' in record) {
+    const hasStructuredKeys = ['narration', 'suggested_actions', 'dialogue', 'new_information', 'newInformation', 'newInfo', 'characters', 'Characters']
+      .some((key) => key in record);
+
+    if (hasStructuredKeys) {
       return record as Partial<AssistantResponse>;
     }
     if ('Response' in record && record.Response !== undefined) {
