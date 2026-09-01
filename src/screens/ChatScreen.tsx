@@ -307,7 +307,7 @@ export function ChatScreen() {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLDivElement>(null);
 
-  const bringInputIntoView = (bottomPercent: number = 0.3) => {
+  const bringInputIntoView = (bottomPercent: number = 0.1) => {
     if (!composerRef.current) return;
 
     requestAnimationFrame(() => {
@@ -335,7 +335,7 @@ export function ChatScreen() {
       }
 
       if (document.activeElement === inputRef.current) {
-        bringInputIntoView(0.3);
+        bringInputIntoView(0.1);
       } else {
         if (composerRef.current) composerRef.current.style.transform = 'translateY(0px)';
       }
@@ -366,7 +366,7 @@ export function ChatScreen() {
     el.style.overflowY = el.scrollHeight > maxHeight ? 'auto' : 'hidden';
 
     if (document.activeElement === el) {
-      bringInputIntoView(0.3);
+      bringInputIntoView(0.1);
     }
   }, [input]);
 
@@ -551,7 +551,7 @@ export function ChatScreen() {
             <div className="flex-1 relative">
               <textarea ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                onFocus={() => bringInputIntoView(0.3)}
+                onFocus={() => bringInputIntoView(0.1)}
                 onBlur={() => {
                   if (composerRef.current) composerRef.current.style.transform = 'translateY(0px)';
                 }}
