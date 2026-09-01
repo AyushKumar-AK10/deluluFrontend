@@ -12,98 +12,133 @@ function parseAssistantResponse(response: string | AssistantResponse | Record<st
   newInformation: string[];
 } {
   const normalizeDialogue = (value: unknown): Array<{ character: string; text: string }> => {
-    if (!Array.isArray(value)) return [];
+    const collectFromObject = (obj: Record<string, unknown>): Array<{ character: string; text: string }> => {
+      const lines: Array<{ character: string; text: string }> = [];
 
-    return value
-      .map((entry) => {
+      for (const [key, entry] of Object.entries(obj)) {
         if (typeof entry === 'string') {
-          return { character: 'Narrator', text: entry };
+          lines.push({ character: key, text: entry });
+          continue;
         }
 
-        if (!entry || typeof entry !== 'object') return null;
+        if (Array.isArray(entry)) {
+          for (const item of entry) {
+            if (item && typeof item === 'object') {
+              const nested = normalizeDialogue(item);
+              lines.push(...nested);
+            } else if (typeof item === 'string') {
+              lines.push({ character: key, text: item });
+            }
+          }
+          continue;
+        }
+
+        if (entry && typeof entry === 'object') {
+          const nested = normalizeDialogue(entry);
+          if (nested.length > 0) {
+            lines.push(...nested);
+          }
+        }
+      }
+
+      return lines;
+    };
+
+    if (Array.isArray(value)) {
+      return value.flatMap((entry) => {
+        if (typeof entry === 'string') return [{ character: 'Narrator', text: entry }];
+        if (!entry || typeof entry !== 'object') return [];
         const record = entry as Record<string, unknown>;
 
-        if ('character' in record || 'Character' in record || 'name' in record || 'Name' in record) {
-          const character = typeof record.character === 'string'
-            ? record.character
-            : typeof record.Character === 'string'
-              ? record.Character
-              : typeof record.name === 'string'
-                ? record.name
-                : typeof record.Name === 'string'
-                  ? record.Name
-                  : 'Narrator';
+        const character = typeof record.character === 'string'
+          ? record.character
+          : typeof record.Character === 'string'
+            ? record.Character
+            : typeof record.name === 'string'
+              ? record.name
+              : typeof record.Name === 'string'
+                ? record.Name
+                : typeof record.characterName === 'string'
+                  ? record.characterName
+                  : typeof record.CharacterName === 'string'
+                    ? record.CharacterName
+                    : 'Narrator';
 
-          const text = typeof record.text === 'string'
-            ? record.text
-            : typeof record.Text === 'string'
-              ? record.Text
-              : typeof record.dialogue === 'string'
-                ? record.dialogue
-                : typeof record.speech === 'string'
-                  ? record.speech
-                  : '';
-
-          return text ? { character, text } : null;
-        }
-
-        const character = typeof record.characterName === 'string'
-          ? record.characterName
-          : typeof record.CharacterName === 'string'
-            ? record.CharacterName
-            : 'Narrator';
         const text = typeof record.text === 'string'
           ? record.text
           : typeof record.Text === 'string'
             ? record.Text
-            : typeof record.value === 'string'
-              ? record.value
-              : '';
+            : typeof record.dialogue === 'string'
+              ? record.dialogue
+              : typeof record.speech === 'string'
+                ? record.speech
+                : typeof record.value === 'string'
+                  ? record.value
+                  : '';
 
-        return text ? { character, text } : null;
-      })
-      .filter((entry): entry is { character: string; text: string } => entry !== null);
+        return text ? [{ character, text }] : [];
+      });
+    }
+
+    if (value && typeof value === 'object') {
+      return collectFromObject(value as Record<string, unknown>);
+    }
+
+    return [];
   };
 
   const normalizeNewInformation = (value: unknown): string[] => {
-    if (!Array.isArray(value)) {
-      if (typeof value === 'string') return value.trim() ? [value.trim()] : [];
-      if (value && typeof value === 'object') {
-        return Object.entries(value as Record<string, unknown>)
-          .map(([, nestedValue]) => typeof nestedValue === 'string' ? nestedValue : JSON.stringify(nestedValue))
-          .filter((entry): entry is string => entry.trim().length > 0);
-      }
-      return [];
-    }
+    const collect = (node: unknown): string[] => {
+      if (!node) return [];
 
-    return value
-      .map((entry) => {
-        if (typeof entry === 'string') return entry;
-        if (entry && typeof entry === 'object') {
-          try {
-            return JSON.stringify(entry, null, 2);
-          } catch {
-            return String(entry);
+      if (typeof node === 'string') {
+        return node.trim() ? [node.trim()] : [];
+      }
+
+      if (Array.isArray(node)) {
+        return node.flatMap((entry) => collect(entry));
+      }
+
+      if (typeof node === 'object') {
+        const record = node as Record<string, unknown>;
+        const entries: string[] = [];
+
+        for (const [key, entry] of Object.entries(record)) {
+          if (['new_information', 'newInformation', 'newInfo', 'fact', 'facts', 'discovery', 'discoveries'].includes(key)) {
+            entries.push(...collect(entry));
+            continue;
+          }
+
+          if (typeof entry === 'string' && entry.trim()) {
+            entries.push(entry.trim());
+          } else if (entry && typeof entry === 'object') {
+            entries.push(...collect(entry));
           }
         }
-        return entry === null || entry === undefined ? '' : String(entry);
-      })
-      .filter((entry): entry is string => entry.trim().length > 0);
+
+        return entries;
+      }
+
+      return [];
+    };
+
+    return collect(value).filter((entry) => entry.trim().length > 0);
   };
 
   const extractStructured = (value: unknown): Partial<AssistantResponse> | null => {
     if (!value || typeof value !== 'object') return null;
 
     const record = value as Record<string, unknown>;
-    const hasStructuredKeys = ['narration', 'suggested_actions', 'dialogue', 'new_information', 'newInformation', 'newInfo', 'characters', 'Characters']
-      .some((key) => key in record);
-
-    if (hasStructuredKeys) {
+    const candidateKeys = ['narration', 'suggested_actions', 'suggestedActions', 'dialogue', 'dialogueLine', 'new_information', 'newInformation', 'newInfo', 'characters', 'Characters'];
+    if (candidateKeys.some((key) => key in record)) {
       return record as Partial<AssistantResponse>;
     }
-    if ('Response' in record && record.Response !== undefined) {
-      return extractStructured(record.Response);
+
+    for (const nestedValue of Object.values(record)) {
+      const found = extractStructured(nestedValue);
+      if (found) return found;
     }
+
     return null;
   };
 
@@ -122,13 +157,20 @@ function parseAssistantResponse(response: string | AssistantResponse | Record<st
       const parsed = JSON.parse(candidate) as unknown;
       const structured = extractStructured(parsed) ?? extractStructured(candidate);
       if (structured) {
+        const narration = typeof structured.narration === 'string' ? structured.narration : candidate;
+        const dialogueValue = Array.isArray(structured.dialogue) || structured.dialogue && typeof structured.dialogue === 'object'
+          ? structured.dialogue
+          : Array.isArray((structured as Record<string, unknown>).characters)
+            ? (structured as Record<string, unknown>).characters
+            : [];
+
         return {
-          narration: typeof structured.narration === 'string' ? structured.narration : candidate,
-          dialogue: normalizeDialogue(structured.dialogue),
+          narration,
+          dialogue: normalizeDialogue(dialogueValue),
           suggestions: Array.isArray(structured.suggested_actions)
             ? structured.suggested_actions.filter((item): item is string => typeof item === 'string')
             : [],
-          newInformation: normalizeNewInformation(structured.new_information),
+          newInformation: normalizeNewInformation(structured.new_information ?? (structured as Record<string, unknown>).newInformation ?? (structured as Record<string, unknown>).newInfo),
         };
       }
 
@@ -140,13 +182,20 @@ function parseAssistantResponse(response: string | AssistantResponse | Record<st
 
   const structured = extractStructured(response);
   if (structured) {
+    const narration = typeof structured.narration === 'string' ? structured.narration : '';
+    const dialogueValue = Array.isArray(structured.dialogue) || structured.dialogue && typeof structured.dialogue === 'object'
+      ? structured.dialogue
+      : Array.isArray((structured as Record<string, unknown>).characters)
+        ? (structured as Record<string, unknown>).characters
+        : [];
+
     return {
-      narration: typeof structured.narration === 'string' ? structured.narration : '',
-      dialogue: normalizeDialogue(structured.dialogue),
+      narration,
+      dialogue: normalizeDialogue(dialogueValue),
       suggestions: Array.isArray(structured.suggested_actions)
         ? structured.suggested_actions.filter((item): item is string => typeof item === 'string')
         : [],
-      newInformation: normalizeNewInformation(structured.new_information),
+      newInformation: normalizeNewInformation(structured.new_information ?? (structured as Record<string, unknown>).newInformation ?? (structured as Record<string, unknown>).newInfo),
     };
   }
 
