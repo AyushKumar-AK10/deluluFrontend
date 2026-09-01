@@ -211,8 +211,9 @@ export const messageApi = {
     const id = data.messageId || data._id || data.id || extractMongoId(data, ['messageId', '_id', 'id']) || '';
     console.log('[messageApi.create] parsed result', {
       raw: data,
-      conversationId,
-      returnedId: id,
+      conversationIdUsedInRequest: conversationId,
+      returnedMessageDocId: id,
+      note: 'returnedMessageDocId is the message document _id, not the conversation id used in the request.',
       candidateKeys: {
         messageId: data.messageId,
         _id: data._id,

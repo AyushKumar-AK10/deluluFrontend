@@ -61,10 +61,9 @@ export function CreateScreen() {
 
       const createdMessageId = await messageApi.create(newConversationId, 'user', content);
       console.log('[create] first message created', {
-        conversationId: newConversationId,
-        messageId: createdMessageId,
-        idsMatch: newConversationId === createdMessageId,
-        createdMessageConversationIdFromServer: createdMessageId,
+        conversationIdUsedForMessageRequest: newConversationId,
+        createdMessageDocId: createdMessageId,
+        note: 'messageId is different from conversationId by design; the message API should be called with the conversationId only.',
       });
 
       if (createdMessageId && !/^[0-9a-fA-F]{24}$/.test(createdMessageId)) {
