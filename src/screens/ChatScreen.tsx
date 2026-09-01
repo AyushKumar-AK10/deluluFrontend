@@ -305,23 +305,19 @@ export function ChatScreen() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const composerRef = useRef<HTMLDivElement>(null);
 
   const bringInputIntoView = (bottomPercent: number = 0.3) => {
-    if (!inputRef.current) return;
+    if (!composerRef.current) return;
 
     requestAnimationFrame(() => {
-      const field = inputRef.current;
-      if (!field) return;
+      const composer = composerRef.current;
+      if (!composer) return;
 
       const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
-      const fieldRect = field.getBoundingClientRect();
-      const desiredBottomOffset = viewportHeight * bottomPercent;
-      const desiredTop = viewportHeight - fieldRect.height - desiredBottomOffset;
-      const delta = desiredTop - fieldRect.top;
-
-      if (Math.abs(delta) > 1) {
-        window.scrollBy({ top: delta, behavior: 'smooth' });
-      }
+      const keyboardInset = Math.max(0, window.innerHeight - viewportHeight);
+      const offset = keyboardInset > 0 ? keyboardInset * bottomPercent : 0;
+      composer.style.transform = `translateY(-${offset}px)`;
     });
   };
 
@@ -340,6 +336,8 @@ export function ChatScreen() {
 
       if (document.activeElement === inputRef.current) {
         bringInputIntoView(0.3);
+      } else {
+        if (composerRef.current) composerRef.current.style.transform = 'translateY(0px)';
       }
     };
 
@@ -548,11 +546,15 @@ export function ChatScreen() {
       </div>
 
       {!storyEnded && (
-        <div className="flex-shrink-0 bg-ink-900/80 backdrop-blur-lg border-t border-ink-700/50 px-4 pt-3 pb-[max(env(safe-area-inset-bottom),12px)] safe-bottom-input">
+        <div ref={composerRef} className="flex-shrink-0 bg-ink-900/80 backdrop-blur-lg border-t border-ink-700/50 px-4 pt-3 pb-[max(env(safe-area-inset-bottom),12px)] safe-bottom-input transition-transform duration-200 ease-out">
           <div className="max-w-2xl mx-auto flex items-end gap-2">
             <div className="flex-1 relative">
               <textarea ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyDown} onFocus={() => bringInputIntoView(0.38)}
+                onKeyDown={handleKeyDown}
+                onFocus={() => bringInputIntoView(0.3)}
+                onBlur={() => {
+                  if (composerRef.current) composerRef.current.style.transform = 'translateY(0px)';
+                }}
                 placeholder="Continue the story..." rows={1} disabled={sending}
                 className="w-full px-4 py-3 rounded-2xl bg-ink-800 border border-ink-600 text-ink-50 text-sm placeholder:text-ink-400 outline-none focus:border-accent/40 transition-colors resize-none disabled:opacity-50 scrollbar-none"
                 style={{ maxHeight: '120px', overflowY: 'hidden' }} />
