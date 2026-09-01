@@ -5,6 +5,20 @@ import type { AssistantResponse, Message } from '@/types';
 import { TypingIndicator } from '@/components/TypingIndicator';
 import { ChevronLeft, Send, Loader2, AlertCircle } from 'lucide-react';
 
+function extractSceneStatusFromText(value: string): string {
+  if (!value) return 'continue';
+
+  const match = value.match(/(?:scene[_ -]?status|sceneStatus)\s*[:=]\s*["']?([a-zA-Z]+)["']?/i);
+  if (match?.[1]) return match[1].trim();
+
+  const normalized = value.toLowerCase();
+  if (normalized.includes('"end"') || normalized.includes("'end'") || normalized.includes('end')) {
+    return 'end';
+  }
+
+  return 'continue';
+}
+
 function parseAssistantResponse(response: string | AssistantResponse | Record<string, unknown> | undefined): {
   narration: string;
   dialogue: Array<{ character: string; text: string }>;
@@ -246,6 +260,12 @@ function parseAssistantResponse(response: string | AssistantResponse | Record<st
             ? (structured as Record<string, unknown>).characters
             : [];
 
+        const sceneStatus = typeof structured.scene_status === 'string'
+          ? structured.scene_status
+          : typeof (structured as Record<string, unknown>).sceneStatus === 'string'
+            ? (structured as Record<string, unknown>).sceneStatus as string
+            : extractSceneStatusFromText(candidate);
+
         return {
           narration,
           dialogue: normalizeDialogue(dialogueValue),
@@ -253,17 +273,15 @@ function parseAssistantResponse(response: string | AssistantResponse | Record<st
             ? structured.suggested_actions.filter((item): item is string => typeof item === 'string')
             : [],
           newInformation: normalizeNewInformation(structured.new_information ?? (structured as Record<string, unknown>).newInformation ?? (structured as Record<string, unknown>).newInfo),
-          sceneStatus: typeof structured.scene_status === 'string'
-            ? structured.scene_status
-            : typeof (structured as Record<string, unknown>).sceneStatus === 'string'
-              ? (structured as Record<string, unknown>).sceneStatus as string
-              : 'continue',
+          sceneStatus,
         };
       }
 
-      return { narration: candidate, dialogue: [], suggestions: [], newInformation: [], sceneStatus: 'continue' };
+      const fallbackStatus = extractSceneStatusFromText(candidate);
+      return { narration: candidate, dialogue: [], suggestions: [], newInformation: [], sceneStatus: fallbackStatus };
     } catch {
-      return { narration: candidate, dialogue: [], suggestions: [], newInformation: [], sceneStatus: 'continue' };
+      const fallbackStatus = extractSceneStatusFromText(candidate);
+      return { narration: candidate, dialogue: [], suggestions: [], newInformation: [], sceneStatus: fallbackStatus };
     }
   }
 
@@ -296,9 +314,20 @@ function parseAssistantResponse(response: string | AssistantResponse | Record<st
 
 const isLastAssistantMessageEnded = (messageList: Message[]) => {
   const lastAssistantMessage = [...messageList].reverse().find((message) => message.role === 'assistant');
-  if (!lastAssistantMessage) return false;
+  if (!lastAssistantMessage) {
+    console.log('[chat] end-check: no assistant message found');
+    return false;
+  }
 
-  return parseAssistantResponse(lastAssistantMessage.content).sceneStatus.toLowerCase() === 'end';
+  const parsed = parseAssistantResponse(lastAssistantMessage.content);
+  console.log('[chat] end-check', {
+    messageId: lastAssistantMessage._id,
+    rawContent: lastAssistantMessage.content,
+    parsedSceneStatus: parsed.sceneStatus,
+    normalizedToEnd: parsed.sceneStatus.toLowerCase() === 'end',
+  });
+
+  return parsed.sceneStatus.toLowerCase() === 'end';
 };
 
 export function ChatScreen() {
@@ -438,6 +467,11 @@ export function ChatScreen() {
     try {
       const response = await messageApi.chat(currentConversation._id, content);
       const parsedResponse = parseAssistantResponse(typeof response === 'string' ? response : response ?? undefined);
+      console.log('[chat] assistant response parsed', {
+        raw: response,
+        parsedSceneStatus: parsedResponse.sceneStatus,
+        narration: parsedResponse.narration,
+      });
       const fullAssistantContent = JSON.stringify({
         narration: parsedResponse.narration,
         dialogue: parsedResponse.dialogue,
