@@ -306,15 +306,22 @@ export function ChatScreen() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  const bringInputIntoView = (block: ScrollLogicalPosition = 'center') => {
+  const bringInputIntoView = (bottomPercent: number = 0.1) => {
     if (!inputRef.current) return;
 
     requestAnimationFrame(() => {
-      inputRef.current?.scrollIntoView({
-        behavior: 'smooth',
-        block,
-        inline: 'nearest',
-      });
+      const field = inputRef.current;
+      if (!field) return;
+
+      const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+      const fieldRect = field.getBoundingClientRect();
+      const desiredBottomOffset = viewportHeight * bottomPercent;
+      const desiredTop = viewportHeight - fieldRect.height - desiredBottomOffset;
+      const delta = desiredTop - fieldRect.top;
+
+      if (Math.abs(delta) > 1) {
+        window.scrollBy({ top: delta, behavior: 'smooth' });
+      }
     });
   };
 
@@ -332,7 +339,7 @@ export function ChatScreen() {
       }
 
       if (document.activeElement === inputRef.current) {
-        bringInputIntoView('center');
+        bringInputIntoView(0.1);
       }
     };
 
@@ -361,7 +368,7 @@ export function ChatScreen() {
     el.style.overflowY = el.scrollHeight > maxHeight ? 'auto' : 'hidden';
 
     if (document.activeElement === el) {
-      bringInputIntoView('center');
+      bringInputIntoView(0.1);
     }
   }, [input]);
 
@@ -545,7 +552,7 @@ export function ChatScreen() {
           <div className="max-w-2xl mx-auto flex items-end gap-2">
             <div className="flex-1 relative">
               <textarea ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyDown} onFocus={() => bringInputIntoView('center')}
+                onKeyDown={handleKeyDown} onFocus={() => bringInputIntoView(0.1)}
                 placeholder="Continue the story..." rows={1} disabled={sending}
                 className="w-full px-4 py-3 rounded-2xl bg-ink-800 border border-ink-600 text-ink-50 text-sm placeholder:text-ink-400 outline-none focus:border-accent/40 transition-colors resize-none disabled:opacity-50 scrollbar-none"
                 style={{ maxHeight: '120px', overflowY: 'hidden' }} />
