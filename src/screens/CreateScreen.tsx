@@ -38,13 +38,20 @@ export function CreateScreen() {
     try {
       const title = buildTitle(form);
       const content = buildContent(form);
+      console.log('[create] starting story creation', {
+        userId: user._id,
+        title,
+        content,
+      });
+
       const newConversationId = await conversationApi.create(user._id, title);
 
       if (!newConversationId || !/^[0-9a-fA-F]{24}$/.test(newConversationId)) {
+        console.error('[create] invalid conversation id returned from server', { newConversationId });
         throw new Error('Invalid conversation id returned from server');
       }
 
-      console.log('[create] creating first message', {
+      console.log('[create] conversation created', {
         conversationId: newConversationId,
         userId: user._id,
         title,
@@ -55,6 +62,8 @@ export function CreateScreen() {
       console.log('[create] first message created', {
         conversationId: newConversationId,
         messageId: createdMessageId,
+        expectedConversationIdMatches: newConversationId === createdMessageId ? 'same id' : 'different ids',
+        createdMessageConversationIdFromServer: createdMessageId,
       });
 
       if (createdMessageId && !/^[0-9a-fA-F]{24}$/.test(createdMessageId)) {

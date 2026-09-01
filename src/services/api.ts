@@ -20,7 +20,13 @@ class ApiError extends Error {
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const url = `${BASE}${path}`;
-  console.log('[api] request', { url, method: options.method || 'GET' });
+  const requestBody = options.body ? String(options.body) : undefined;
+  console.log('[api] request start', {
+    url,
+    method: options.method || 'GET',
+    body: requestBody,
+    headers: options.headers,
+  });
 
   const res = await fetch(url, {
     credentials: 'include',
@@ -44,7 +50,11 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (!text) return {} as T;
   try {
     const parsed = JSON.parse(text) as T;
-    console.log('[api] parsed response', { url, parsed });
+    console.log('[api] parsed response', {
+      url,
+      raw: text,
+      parsed,
+    });
     return parsed;
   } catch {
     console.log('[api] plain text response', { url, text });
@@ -71,12 +81,26 @@ export const authApi = {
 
 export const conversationApi = {
   async create(userId: string, title: string): Promise<string> {
+    const payload = { title };
+    console.log('[conversationApi.create] input', { userId, payload });
+
     const data = await request<{ conversationId?: string; _id?: string; id?: string; message?: string }>(`/user/${userId}`, {
       method: 'POST',
-      body: JSON.stringify({ title }),
+      body: JSON.stringify(payload),
     });
 
     const id = data.conversationId || data._id || data.id || extractMongoId(data, ['conversationId', '_id', 'id']);
+    console.log('[conversationApi.create] parsed result', {
+      raw: data,
+      returnedId: id,
+      candidateKeys: {
+        conversationId: data.conversationId,
+        _id: data._id,
+        id: data.id,
+        message: data.message,
+      },
+    });
+
     if (!id) throw new ApiError('Could not parse conversation id', 500);
     return id;
   },
@@ -174,11 +198,27 @@ function extractMongoId(payload: unknown, preferredKeys: string[]): string {
 
 export const messageApi = {
   async create(conversationId: string, role: string, content: string): Promise<string> {
+    const payload = { role, content };
+    console.log('[messageApi.create] input', { conversationId, payload });
+
     const data = await request<{ messageId?: string; _id?: string; id?: string; message?: string }>(`/message/${conversationId}`, {
       method: 'POST',
-      body: JSON.stringify({ role, content }),
+      body: JSON.stringify(payload),
     });
-    return data.messageId || data._id || data.id || extractMongoId(data, ['messageId', '_id', 'id']) || '';
+
+    const id = data.messageId || data._id || data.id || extractMongoId(data, ['messageId', '_id', 'id']) || '';
+    console.log('[messageApi.create] parsed result', {
+      raw: data,
+      conversationId,
+      returnedId: id,
+      candidateKeys: {
+        messageId: data.messageId,
+        _id: data._id,
+        id: data.id,
+        message: data.message,
+      },
+    });
+    return id;
   },
   async chat(conversationId: string, content: string): Promise<string | AssistantResponse> {
     const data = await request<{ Response?: unknown }>(`/chat/${conversationId}`, {
