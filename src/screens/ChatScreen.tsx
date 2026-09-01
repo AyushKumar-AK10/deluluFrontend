@@ -72,6 +72,30 @@ export function ChatScreen() {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    const handleResize = () => {
+      const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+      const keyboardInset = window.innerHeight - viewportHeight;
+      const container = scrollContainerRef.current;
+      if (!container) return;
+
+      if (keyboardInset > 0) {
+        container.style.paddingBottom = `${Math.max(keyboardInset + 16, 72)}px`;
+      } else {
+        container.style.paddingBottom = '16px';
+      }
+    };
+
+    handleResize();
+    window.visualViewport?.addEventListener('resize', handleResize);
+    window.visualViewport?.addEventListener('scroll', handleResize);
+
+    return () => {
+      window.visualViewport?.removeEventListener('resize', handleResize);
+      window.visualViewport?.removeEventListener('scroll', handleResize);
+    };
+  }, []);
+
+  useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, sending]);
 
@@ -192,7 +216,7 @@ export function ChatScreen() {
         </div>
       </div>
 
-      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 py-4">
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 py-4" style={{ paddingBottom: '16px' }}>
         <div className="max-w-2xl mx-auto space-y-4">
           {loadingHistory && (
             <div className="flex flex-col items-center justify-center py-20 animate-fade-in">
@@ -231,7 +255,7 @@ export function ChatScreen() {
         </div>
       </div>
 
-      <div className="flex-shrink-0 bg-ink-900/80 backdrop-blur-lg border-t border-ink-700/50 px-4 pt-3 pb-3 safe-bottom-input">
+      <div className="flex-shrink-0 bg-ink-900/80 backdrop-blur-lg border-t border-ink-700/50 px-4 pt-3 pb-[max(env(safe-area-inset-bottom),12px)] safe-bottom-input">
         <div className="max-w-2xl mx-auto flex items-end gap-2">
           <div className="flex-1 relative">
             <textarea ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)}
