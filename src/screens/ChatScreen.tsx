@@ -12,12 +12,91 @@ function parseAssistantResponse(response: string | AssistantResponse | Record<st
   newInformation: string[];
 } {
   const normalizeDialogue = (value: unknown): Array<{ character: string; text: string }> => {
+    const splitCharacterText = (raw: string): { character: string; text: string } | null => {
+      const trimmed = raw.trim();
+      if (!trimmed) return null;
+
+      const match = trimmed.match(/^([^:]+?)\s*:\s*(.+)$/);
+      if (!match) return null;
+
+      const character = match[1].trim();
+      const text = match[2].trim();
+      if (!character || !text) return null;
+      return { character, text };
+    };
+
+    const extractDialogueEntry = (record: Record<string, unknown>): { character: string; text: string } | null => {
+      const candidateCharacter = typeof record.character === 'string'
+        ? record.character
+        : typeof record.Character === 'string'
+          ? record.Character
+          : typeof record.name === 'string'
+            ? record.name
+            : typeof record.Name === 'string'
+              ? record.Name
+              : typeof record.speaker === 'string'
+                ? record.speaker
+                : typeof record.Speaker === 'string'
+                  ? record.Speaker
+                  : typeof record.characterName === 'string'
+                    ? record.characterName
+                    : typeof record.CharacterName === 'string'
+                      ? record.CharacterName
+                      : typeof record.narrator === 'string'
+                        ? record.narrator
+                        : typeof record.Narrator === 'string'
+                          ? record.Narrator
+                          : '';
+
+      const candidateText = typeof record.text === 'string'
+        ? record.text
+        : typeof record.Text === 'string'
+          ? record.Text
+          : typeof record.dialogue === 'string'
+            ? record.dialogue
+            : typeof record.Dialogue === 'string'
+              ? record.Dialogue
+              : typeof record.speech === 'string'
+                ? record.speech
+                : typeof record.Speech === 'string'
+                  ? record.Speech
+                  : typeof record.value === 'string'
+                    ? record.value
+                    : typeof record.Value === 'string'
+                      ? record.Value
+                      : '';
+
+      if (!candidateText.trim()) return null;
+
+      if (candidateCharacter.trim()) {
+        return { character: candidateCharacter.trim(), text: candidateText.trim() };
+      }
+
+      const split = splitCharacterText(candidateText);
+      if (split) return split;
+
+      return { character: 'Narrator', text: candidateText.trim() };
+    };
+
     const collectFromObject = (obj: Record<string, unknown>): Array<{ character: string; text: string }> => {
       const lines: Array<{ character: string; text: string }> = [];
 
+      const directEntry = extractDialogueEntry(obj);
+      if (directEntry) return [directEntry];
+
       for (const [key, entry] of Object.entries(obj)) {
+        if (['narration', 'Narration', 'description', 'Description', 'scene_status', 'sceneStatus', 'new_information', 'newInformation', 'newInfo', 'suggested_actions', 'suggestedActions'].includes(key)) {
+          continue;
+        }
+
         if (typeof entry === 'string') {
-          lines.push({ character: key, text: entry });
+          const split = splitCharacterText(entry);
+          const fallback = entry.trim();
+          if (split) {
+            lines.push(split);
+          } else if (fallback && !['Narrator', 'Narration', 'Scene'].includes(key)) {
+            lines.push({ character: key, text: fallback });
+          }
           continue;
         }
 
@@ -27,7 +106,12 @@ function parseAssistantResponse(response: string | AssistantResponse | Record<st
               const nested = normalizeDialogue(item);
               lines.push(...nested);
             } else if (typeof item === 'string') {
-              lines.push({ character: key, text: item });
+              const split = splitCharacterText(item);
+              if (split) {
+                lines.push(split);
+              } else {
+                lines.push({ character: key, text: item });
+              }
             }
           }
           continue;
@@ -46,37 +130,15 @@ function parseAssistantResponse(response: string | AssistantResponse | Record<st
 
     if (Array.isArray(value)) {
       return value.flatMap((entry) => {
-        if (typeof entry === 'string') return [{ character: 'Narrator', text: entry }];
+        if (typeof entry === 'string') {
+          const split = splitCharacterText(entry);
+          return split ? [split] : [{ character: 'Narrator', text: entry }];
+        }
+
         if (!entry || typeof entry !== 'object') return [];
         const record = entry as Record<string, unknown>;
-
-        const character = typeof record.character === 'string'
-          ? record.character
-          : typeof record.Character === 'string'
-            ? record.Character
-            : typeof record.name === 'string'
-              ? record.name
-              : typeof record.Name === 'string'
-                ? record.Name
-                : typeof record.characterName === 'string'
-                  ? record.characterName
-                  : typeof record.CharacterName === 'string'
-                    ? record.CharacterName
-                    : 'Narrator';
-
-        const text = typeof record.text === 'string'
-          ? record.text
-          : typeof record.Text === 'string'
-            ? record.Text
-            : typeof record.dialogue === 'string'
-              ? record.dialogue
-              : typeof record.speech === 'string'
-                ? record.speech
-                : typeof record.value === 'string'
-                  ? record.value
-                  : '';
-
-        return text ? [{ character, text }] : [];
+        const directEntry = extractDialogueEntry(record);
+        return directEntry ? [directEntry] : [];
       });
     }
 
