@@ -90,6 +90,8 @@ export const conversationApi = {
     });
 
     const id = data.conversationId || data._id || data.id || extractMongoId(data, ['conversationId', '_id', 'id']);
+    console.log('[conversationApi.create] raw response', data);
+    console.log('[conversationApi.create] selected conversationId', id);
     console.log('[conversationApi.create] parsed result', {
       raw: data,
       returnedId: id,

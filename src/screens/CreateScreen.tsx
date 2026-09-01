@@ -57,12 +57,13 @@ export function CreateScreen() {
         title,
         contentLength: content.length,
       });
+      console.log('[create] calling messageApi.create with conversationId', newConversationId);
 
       const createdMessageId = await messageApi.create(newConversationId, 'user', content);
       console.log('[create] first message created', {
         conversationId: newConversationId,
         messageId: createdMessageId,
-        expectedConversationIdMatches: newConversationId === createdMessageId ? 'same id' : 'different ids',
+        idsMatch: newConversationId === createdMessageId,
         createdMessageConversationIdFromServer: createdMessageId,
       });
 
