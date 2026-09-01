@@ -37,11 +37,24 @@ export function CreateScreen() {
     setSubmitting(true); setError(null);
     try {
       const title = buildTitle(form);
-      const conversationId = await conversationApi.create(user._id, title);
       const content = buildContent(form);
-      await messageApi.create(conversationId, 'user', content);
+      const newConversationId = await conversationApi.create(user._id, title);
+
+      console.log('[create] creating first message', {
+        conversationId: newConversationId,
+        userId: user._id,
+        title,
+        contentLength: content.length,
+      });
+
+      const createdMessageId = await messageApi.create(newConversationId, 'user', content);
+      console.log('[create] first message created', {
+        conversationId: newConversationId,
+        messageId: createdMessageId,
+      });
+
       const newConversation = {
-        _id: conversationId, userId: user._id, title,
+        _id: newConversationId, userId: user._id, title,
         createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
       };
       setCurrentConversation(newConversation);
