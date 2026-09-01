@@ -294,6 +294,13 @@ function parseAssistantResponse(response: string | AssistantResponse | Record<st
   return { narration: '', dialogue: [], suggestions: [], newInformation: [], sceneStatus: 'continue' };
 }
 
+const isLastAssistantMessageEnded = (messageList: Message[]) => {
+  const lastAssistantMessage = [...messageList].reverse().find((message) => message.role === 'assistant');
+  if (!lastAssistantMessage) return false;
+
+  return parseAssistantResponse(lastAssistantMessage.content).sceneStatus.toLowerCase() === 'end';
+};
+
 export function ChatScreen() {
   const { currentConversation, messages, setMessages, addMessage, navigate } = useAuth();
   const [input, setInput] = useState('');
@@ -376,13 +383,7 @@ export function ChatScreen() {
       return;
     }
 
-    const ended = messages.some((msg) => {
-      if (msg.role !== 'assistant') return false;
-      const parsed = parseAssistantResponse(msg.content);
-      return parsed.sceneStatus.toLowerCase() === 'end';
-    });
-
-    setStoryEnded(ended);
+    setStoryEnded(isLastAssistantMessageEnded(messages));
   }, [currentConversation, messages]);
 
   useEffect(() => {
