@@ -6,7 +6,7 @@ import { Slider } from '@/components/Slider';
 import { ChevronLeft, Play, Loader2 } from 'lucide-react';
 
 const INITIAL_FORM: DeluluFormData = {
-  name: '', gender: '', age: '', genre: '', plot: '', tragicLevel: 5, dramaLevel: 5,
+  name: '', gender: '', age: '', genre: '', place: '', plot: '', tragicLevel: 5, dramaLevel: 5,
 };
 
 export function CreateScreen() {
@@ -23,9 +23,11 @@ export function CreateScreen() {
 
   const buildContent = (data: DeluluFormData): string => [
     `Character Name: ${data.name}`, `Gender: ${data.gender}`, `Age: ${data.age}`,
-    `Genre: ${data.genre}`, `Plot: ${data.plot}`,
+    `Genre: ${data.genre}`,
+    data.place?.trim() ? `Place: ${data.place.trim()}` : null,
+    `Plot: ${data.plot}`,
     `Tragic Level: ${data.tragicLevel}/10`, `Drama Level: ${data.dramaLevel}/10`,
-  ].join('\n');
+  ].filter(Boolean).join('\n');
 
   const buildTitle = (data: DeluluFormData): string => {
     const firstWord = data.plot.trim().split(/\s+/).slice(0, 4).join(' ');
@@ -130,7 +132,13 @@ export function CreateScreen() {
             </div>
           </Field>
 
-          <Field label="Plot" delay={0.2}>
+          <Field label="Place (optional)" delay={0.2}>
+            <input type="text" value={form.place ?? ''} onChange={(e) => update('place', e.target.value)}
+              placeholder="e.g. Paris, haunted mansion, moonlit forest" maxLength={80}
+              className="delulu-input" />
+          </Field>
+
+          <Field label="Plot" delay={0.25}>
             <textarea value={form.plot} onChange={(e) => update('plot', e.target.value)}
               placeholder="Describe the scenario you want to experience..." rows={4} maxLength={1000}
               className="delulu-input resize-none leading-relaxed" />

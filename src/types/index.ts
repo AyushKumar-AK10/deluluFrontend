@@ -39,6 +39,7 @@ export interface DeluluFormData {
   gender: string;
   age: string;
   genre: string;
+  place?: string;
   plot: string;
   tragicLevel: number;
   dramaLevel: number;
