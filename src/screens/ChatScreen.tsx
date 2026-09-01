@@ -225,7 +225,7 @@ export function ChatScreen() {
             </div>
           )}
 
-          {!loadingHistory && messages.length === 0 && !sending && (
+          {!loadingHistory && !sending && messages.length === 0 && (
             <div className="flex flex-col items-center justify-center py-20 animate-fade-in">
               <button
                 type="button"

@@ -76,6 +76,8 @@ export function CreateScreen() {
       };
       setCurrentConversation(newConversation);
       setMessages([]);
+      setError(null);
+      setForm(INITIAL_FORM);
       navigate('chat');
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to start your story';
