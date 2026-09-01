@@ -388,6 +388,7 @@ export function ChatScreen() {
   }, [currentConversation, messages, setMessages]);
 
   const submitMessage = async (content: string) => {
+    if (storyEnded) return;
     if (!content || sending || !currentConversation) return;
     setSending(true); setError(null);
 
@@ -435,12 +436,14 @@ export function ChatScreen() {
   };
 
   const handleSend = async () => {
+    if (storyEnded) return;
     const content = input.trim();
     if (!content) return;
     await submitMessage(content);
   };
 
   const handleSuggestionClick = async (optionIndex: number, optionText?: string) => {
+    if (storyEnded) return;
     const selectedText = optionText || `Selected Option ${optionIndex}`;
     await submitMessage(selectedText);
   };
