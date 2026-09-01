@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { conversationApi, messageApi } from '@/services/api';
+import { conversationApi } from '@/services/api';
 import { GENRES, GENDERS, type DeluluFormData } from '@/types';
 import { Slider } from '@/components/Slider';
 import { ChevronLeft, Play, Loader2 } from 'lucide-react';
@@ -38,8 +38,6 @@ export function CreateScreen() {
     try {
       const title = buildTitle(form);
       const conversationId = await conversationApi.create(user._id, title);
-      const content = buildContent(form);
-      await messageApi.create(conversationId, 'user', content);
       const newConversation = {
         _id: conversationId, userId: user._id, title,
         createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),

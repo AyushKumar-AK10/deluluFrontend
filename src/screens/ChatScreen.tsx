@@ -203,7 +203,13 @@ export function ChatScreen() {
 
           {!loadingHistory && messages.length === 0 && !sending && (
             <div className="flex flex-col items-center justify-center py-20 animate-fade-in">
-              <p className="text-ink-300 text-sm text-center max-w-xs">Your story is ready to unfold. Send a message to begin.</p>
+              <button
+                type="button"
+                onClick={() => submitMessage('Begin Delulu')}
+                className="rounded-full border border-accent/40 bg-accent/10 px-5 py-2.5 text-sm font-medium text-accent shadow-lg shadow-accent/10 transition-all duration-200 hover:bg-accent/20 active:scale-95"
+              >
+                Begin Delulu
+              </button>
             </div>
           )}
 
